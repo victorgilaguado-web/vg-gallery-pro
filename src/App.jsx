@@ -36,7 +36,7 @@ function LockScreen({ project, onUnlock }) {
 
   return (
     <div style={{ height: '100vh', background: '#0a0a0a', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#fff', fontFamily: 'Inter', padding: 20 }}>
-       {project?.client_logo && <img src={project.client_logo} alt="Client Logo" style={{ height: 60, marginBottom: 50, objectFit: 'contain' }} />}
+       {project?.client_logo && <img src={project.client_logo} alt="Client Logo" style={{ height: 120, marginBottom: 50, objectFit: 'contain', maxWidth: '90%' }} />}
        
        <div style={{ border: '1px solid #222', background: '#111', padding: '40px', borderRadius: 8, textAlign: 'center', width: '100%', maxWidth: 380, boxShadow: '0 20px 40px rgba(0,0,0,0.5)' }}>
           <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}>
