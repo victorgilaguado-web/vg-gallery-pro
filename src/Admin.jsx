@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabase';
-import { Edit2, Plus, Folder, Calendar, Trash2, Settings, Image as ImageIcon, Link as LinkIcon } from 'lucide-react';
+import { Edit2, Plus, Folder, Calendar, Trash2, Settings, Image as ImageIcon, Link as LinkIcon, Eye } from 'lucide-react';
 
 export function Admin() {
   const [pass, setPass] = useState('');
@@ -491,9 +491,9 @@ export function Admin() {
                          <span style={{fontSize: 13, color: '#ccc'}}>{look.name}</span>
                       </div>
                       <div style={{ display: 'flex', gap: 8 }}>
-                         <button onClick={() => loadLookPhotos(look)} style={{ background: 'transparent', border: '1px solid #444', color: '#ccc', borderRadius: 4, padding: '4px 8px', fontSize: 11, cursor: 'pointer' }}>👁️ Ver Fotos</button>
-                         <button onClick={() => renameLook(look.id, look.name)} style={{ background: 'transparent', border: 'none', color: '#555', cursor: 'pointer', padding: 0 }}><Edit2 size={14} /></button>
-                         <button onClick={() => deleteLook(look.id, look.name)} style={{ background: 'transparent', border: 'none', color: '#c0392b', cursor: 'pointer', padding: 0 }}><Trash2 size={14} /></button>
+                         <button onClick={() => loadLookPhotos(look)} style={{ background: 'transparent', border: 'none', color: '#aaa', cursor: 'pointer', padding: 0 }} title="Ver Fotos"><Eye size={14} /></button>
+                         <button onClick={() => renameLook(look.id, look.name)} style={{ background: 'transparent', border: 'none', color: '#555', cursor: 'pointer', padding: 0 }} title="Renombrar"><Edit2 size={14} /></button>
+                         <button onClick={() => deleteLook(look.id, look.name)} style={{ background: 'transparent', border: 'none', color: '#c0392b', cursor: 'pointer', padding: 0 }} title="Eliminar"><Trash2 size={14} /></button>
                       </div>
                     </div>
                   ))}
