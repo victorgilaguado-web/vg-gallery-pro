@@ -1,7 +1,7 @@
 import React from 'react';
 import { X } from 'lucide-react';
 
-const COLORS = ['#E74C3C', '#F39C12', '#2ECC71'];
+const COLORS = ['#E74C3C', '#F39C12', '#3498DB', '#2ECC71'];
 
 export function FilterBar({ S_filt, setFilt, lookPhotos, filteredPhotos }) {
   

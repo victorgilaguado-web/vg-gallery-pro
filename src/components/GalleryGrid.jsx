@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { PhotoModal } from './PhotoModal';
 
-const COLORS = ['#E74C3C', '#F39C12', '#2ECC71'];
+const COLORS = ['#E74C3C', '#F39C12', '#3498DB', '#2ECC71'];
 
 function thumb(url, w=800) {
   if (!url) return '';
@@ -12,7 +12,9 @@ function thumb(url, w=800) {
 }
 
 export function GalleryGrid({ photos, onUpdatePhoto }) {
-  const [selPhoto, setSelPhoto] = useState(null);
+  const [selPhotoId, setSelPhotoId] = useState(null);
+  
+  const selPhoto = selPhotoId ? photos.find(p => p.id === selPhotoId) : null;
 
   if (!photos || photos.length === 0) {
     return <div style={{ textAlign: 'center', padding: '48px', fontSize: '11px', color: '#555', letterSpacing: '2px', textTransform: 'uppercase' }}>Sin fotos</div>;
@@ -26,7 +28,7 @@ export function GalleryGrid({ photos, onUpdatePhoto }) {
           const st = parseInt(p.stars) || 0;
 
           return (
-            <div key={p.id} className="photo-card" onClick={() => setSelPhoto(p)}>
+            <div key={p.id} className="photo-card" onClick={() => setSelPhotoId(p.id)}>
               <div className="img-wrap">
                 {p.url && <img src={thumb(p.url, 1000)} alt="" />}
                 {col >= 0 && <div className="color-dot" style={{ background: COLORS[col] }}></div>}
@@ -65,7 +67,9 @@ export function GalleryGrid({ photos, onUpdatePhoto }) {
       {selPhoto && (
         <PhotoModal 
           photo={selPhoto} 
-          onClose={() => setSelPhoto(null)} 
+          allPhotos={photos}
+          onNavigate={(p) => setSelPhotoId(p.id)}
+          onClose={() => setSelPhotoId(null)} 
           onUpdate={onUpdatePhoto} 
         />
       )}
