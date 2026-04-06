@@ -168,6 +168,37 @@
   color: var(--bg-base);
 }
 
+.zoom-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100px;
+  height: 2px;
+  background: var(--border-color);
+  outline: none;
+  border-radius: 2px;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+  cursor: pointer;
+}
+.zoom-slider:hover {
+  opacity: 1;
+}
+.zoom-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--text-primary);
+  cursor: pointer;
+  box-shadow: 0 0 4px rgba(0,0,0,0.5);
+  transition: transform 0.1s;
+}
+.zoom-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.3);
+}
+
+
 .grid-layout {
   column-count: 4;
   column-gap: 2px;

@@ -71,6 +71,15 @@ function App() {
   const [activeDay, setActiveDay] = useState(null);
   const [activeLook, setActiveLook] = useState(null);
   const [filter, setFilter] = useState(null);
+  
+  const getInitialCols = () => {
+    const w = window.innerWidth;
+    if (w <= 600) return 1;
+    if (w <= 1000) return 2;
+    if (w <= 1400) return 3;
+    return 4;
+  };
+  const [gridCols, setGridCols] = useState(getInitialCols);
 
   if (window.location.pathname === '/admin') {
     return <Admin />;
@@ -166,8 +175,8 @@ function App() {
 
       return (
         <>
-          <FilterBar S_filt={filter} setFilt={setFilter} lookPhotos={lookPhotos} filteredPhotos={filteredPhotos} />
-          <GalleryGrid photos={filteredPhotos} onUpdatePhoto={updatePhoto} />
+          <FilterBar S_filt={filter} setFilt={setFilter} lookPhotos={lookPhotos} filteredPhotos={filteredPhotos} gridCols={gridCols} setGridCols={setGridCols} />
+          <GalleryGrid photos={filteredPhotos} onUpdatePhoto={updatePhoto} gridCols={gridCols} />
         </>
       );
     }

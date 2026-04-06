@@ -1,9 +1,9 @@
 import React from 'react';
-import { X } from 'lucide-react';
+import { X, Search } from 'lucide-react';
 
 const COLORS = ['#E74C3C', '#F39C12', '#3498DB', '#2ECC71'];
 
-export function FilterBar({ S_filt, setFilt, lookPhotos, filteredPhotos }) {
+export function FilterBar({ S_filt, setFilt, lookPhotos, filteredPhotos, gridCols, setGridCols }) {
   
   return (
     <div className="filter-bar">
@@ -53,8 +53,20 @@ export function FilterBar({ S_filt, setFilt, lookPhotos, filteredPhotos }) {
         )}
       </div>
 
-      <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', letterSpacing: '1px' }}>
-        {filteredPhotos.length} / {lookPhotos.length}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-tertiary)' }} title="Zoom de cuadrícula">
+           <Search size={14} />
+           <input 
+              type="range" 
+              min="1" max="8" 
+              value={gridCols} 
+              onChange={e => setGridCols(Number(e.target.value))} 
+              className="zoom-slider"
+           />
+        </div>
+        <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', letterSpacing: '1px', minWidth: '40px', textAlign: 'right' }}>
+          {filteredPhotos.length} / {lookPhotos.length}
+        </div>
       </div>
     </div>
   );

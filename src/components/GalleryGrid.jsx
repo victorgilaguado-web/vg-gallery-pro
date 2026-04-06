@@ -11,7 +11,7 @@ function thumb(url, w=800) {
   return url;
 }
 
-export function GalleryGrid({ photos, onUpdatePhoto }) {
+export function GalleryGrid({ photos, onUpdatePhoto, gridCols }) {
   const [selPhotoId, setSelPhotoId] = useState(null);
   
   const selPhoto = selPhotoId ? photos.find(p => p.id === selPhotoId) : null;
@@ -22,7 +22,7 @@ export function GalleryGrid({ photos, onUpdatePhoto }) {
 
   return (
     <div className="gallery-container">
-      <div className="grid-layout">
+      <div className="grid-layout" style={{ columnCount: gridCols }}>
         {photos.map(p => {
           const col = p.color == null ? -1 : parseInt(p.color);
           const st = parseInt(p.stars) || 0;
