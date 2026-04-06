@@ -18,7 +18,7 @@ export function Header({ project, photosCount, daysCount, totalStarred, totalSel
     <header className="header">
       <div className="header-left">
         <div className="logo-box">
-          <img src="/logo.png" alt="VG Studio" style={{ height: '32px', filter: 'invert(1)', opacity: 0.9 }} />
+          <img src="/logo.png" alt="VG Studio" style={{ height: '80px', filter: 'invert(1)', opacity: 0.9 }} />
         </div>
         <div className="divider"></div>
         <div className="title-area">
