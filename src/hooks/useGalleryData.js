@@ -69,14 +69,29 @@ export function useGalleryData() {
          const chunkSize = 50;
          for (let i = 0; i < lids.length; i += chunkSize) {
             const chunk = lids.slice(i, i + chunkSize);
-            const { data: chunkPhotos } = await supabase
-               .from('photos')
-               .select('*')
-               .in('look_id', chunk)
-               .limit(10000)
-               .order('sort_order');
-            if (chunkPhotos) {
-               filteredPhotos = [...filteredPhotos, ...chunkPhotos];
+            
+            let page = 0;
+            const pageSize = 1000;
+            let hasMore = true;
+            
+            while (hasMore) {
+               const { data: chunkPhotos } = await supabase
+                  .from('photos')
+                  .select('*')
+                  .in('look_id', chunk)
+                  .order('sort_order')
+                  .range(page * pageSize, (page + 1) * pageSize - 1);
+                  
+               if (chunkPhotos && chunkPhotos.length > 0) {
+                  filteredPhotos.push(...chunkPhotos);
+                  if (chunkPhotos.length < pageSize) {
+                     hasMore = false;
+                  } else {
+                     page++;
+                  }
+               } else {
+                  hasMore = false;
+               }
             }
          }
       }

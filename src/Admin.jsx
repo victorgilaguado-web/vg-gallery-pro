@@ -300,8 +300,20 @@ export function Admin() {
   const loadLookPhotos = async (look) => {
     setManagingLook(look);
     setLoadingPhotos(true);
-    const { data } = await supabase.from('photos').select('*').eq('look_id', look.id).order('id', { ascending: false }).limit(10000);
-    setFolderPhotos(data || []);
+    let allPhotos = [];
+    let page = 0;
+    let hasMore = true;
+    while (hasMore) {
+       const { data } = await supabase.from('photos').select('*').eq('look_id', look.id).order('id', { ascending: false }).range(page * 1000, (page + 1) * 1000 - 1);
+       if (data && data.length > 0) {
+          allPhotos.push(...data);
+          if (data.length < 1000) hasMore = false;
+          else page++;
+       } else {
+          hasMore = false;
+       }
+    }
+    setFolderPhotos(allPhotos);
     setLoadingPhotos(false);
   };
 
