@@ -3,12 +3,7 @@ import React, { useState } from 'react';
 export function Tabs({ days, activeDay, activeLook, onTabChange }) {
   return (
     <div className="tabs-container">
-      <button 
-        className={`tab-btn ${activeLook === 'moodboard' && !activeDay ? 'active' : ''}`}
-        onClick={() => onTabChange(null, 'moodboard')}
-      >
-        <span>Moodboard</span>
-      </button>
+
 
       {days.map((d) => (
         <button 

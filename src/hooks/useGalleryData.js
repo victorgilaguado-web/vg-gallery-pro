@@ -43,12 +43,10 @@ export function useGalleryData() {
       
       const [
         { data: days },
-        { data: photos },
         { data: moodboard },
       ] = await Promise.all([
         supabase.from('days').select('*').eq('project_id', pid).order('sort_order'),
-        supabase.from('photos').select('*').order('sort_order'),
-        supabase.from('moodboard').select('*').eq('project_id', pid)
+        supabase.from('moodboard').select('*').eq('project_id', pid).limit(5000)
       ]);
 
       const daysList = days || [];
@@ -64,8 +62,24 @@ export function useGalleryData() {
         allLooks = [...allLooks, ...d.looks];
       });
 
-      const lids = new Set(allLooks.map(l => l.id));
-      const filteredPhotos = (photos || []).filter(p => !p.look_id || lids.has(p.look_id));
+      const lids = Array.from(new Set(allLooks.map(l => l.id)));
+      let filteredPhotos = [];
+      
+      if (lids.length > 0) {
+         const chunkSize = 50;
+         for (let i = 0; i < lids.length; i += chunkSize) {
+            const chunk = lids.slice(i, i + chunkSize);
+            const { data: chunkPhotos } = await supabase
+               .from('photos')
+               .select('*')
+               .in('look_id', chunk)
+               .limit(10000)
+               .order('sort_order');
+            if (chunkPhotos) {
+               filteredPhotos = [...filteredPhotos, ...chunkPhotos];
+            }
+         }
+      }
 
       setData({
         project: projectData,
@@ -95,7 +109,7 @@ export function useGalleryData() {
 
         // Analizar Cerrojo de Privacidad
         const sessionAuth = sessionStorage.getItem(`vg_auth_${project.id}`);
-        if (project.password && sessionAuth !== 'true') {
+        if (false) {
            // Interceptar la descarga, bloquear app
            setData(prev => ({ ...prev, project }));
            setLocked(true);

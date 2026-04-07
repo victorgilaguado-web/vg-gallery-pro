@@ -134,22 +134,7 @@ function App() {
   const currentLooks = currentDayInfo?.looks || [];
 
   const renderContent = () => {
-    if (activeLook === 'moodboard' && !activeDay) {
-      if (!moodboard || moodboard.length === 0) {
-         return <div style={{ textAlign: 'center', padding: '48px', color: 'var(--text-tertiary)', fontSize: 11, letterSpacing: 2, textTransform: 'uppercase' }}>Sin imágenes en moodboard</div>;
-      }
-      return (
-        <div style={{ padding: '24px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '4px' }}>
-            {moodboard.map(m => (
-               <div key={m.id} style={{ aspectRatio: 1, overflow: 'hidden', borderRadius: '4px' }}>
-                 <img src={thumb(m.url, 600)} alt="moodboard" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-               </div>
-            ))}
-          </div>
-        </div>
-      );
-    } 
+
 
     if (activeLook === 'summary' && !activeDay) {
       return <Summary photos={photos} onUpdatePhoto={updatePhoto} />;

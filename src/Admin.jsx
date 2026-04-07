@@ -274,17 +274,9 @@ export function Admin() {
       if (!uploadError && data) {
         const { data: { publicUrl } } = supabase.storage.from('photos').getPublicUrl(fileName);
         
-        if (selectedLook === 'moodboard') {
-           // Inserta en la otra tabla si es moodboard
-           await supabase.from('moodboard').insert([
-             { url: publicUrl, project_id: project?.id }
-           ]);
-        } else {
-           // Insercion normal de carrete
-           await supabase.from('photos').insert([
-             { url: publicUrl, look_id: selectedLook, stars: 0, color: null }
-           ]);
-        }
+        await supabase.from('photos').insert([
+          { url: publicUrl, look_id: selectedLook, stars: 0, color: null }
+        ]);
       } else {
         console.error("Error subiendo ", file.name, uploadError);
         alert("Fallo subiendo foto: " + uploadError?.message);
@@ -308,7 +300,7 @@ export function Admin() {
   const loadLookPhotos = async (look) => {
     setManagingLook(look);
     setLoadingPhotos(true);
-    const { data } = await supabase.from('photos').select('*').eq('look_id', look.id).order('id', { ascending: false });
+    const { data } = await supabase.from('photos').select('*').eq('look_id', look.id).order('id', { ascending: false }).limit(10000);
     setFolderPhotos(data || []);
     setLoadingPhotos(false);
   };
@@ -524,9 +516,6 @@ export function Admin() {
               onChange={e => setSelectedLook(e.target.value)}
               style={{ background: '#0a0a0a', color: '#fff', border: '1px solid #444', padding: '14px 12px', borderRadius: 6, width: '100%', maxWidth: '400px', cursor: 'pointer', fontSize: 15 }}
             >
-              <optgroup label="🌟 Inserciones Especiales">
-                 <option value="moodboard">✨ Destino: Moodboard de Inspiración</option>
-              </optgroup>
               
               <option value="" disabled>─ Carpetas de Galería ─</option>
               {days.map(d => {
@@ -578,7 +567,7 @@ export function Admin() {
             </div>
           ) : (
             <div>
-              <h3 style={{ fontWeight: 400, color: '#ccc', marginBottom: 10 }}>Arrastra las imágenes para {selectedLook === 'moodboard' ? 'Moodboard' : 'la Carpeta'} aquí</h3>
+              <h3 style={{ fontWeight: 400, color: '#ccc', marginBottom: 10 }}>Arrastra las imágenes para la Carpeta aquí</h3>
               <p style={{ fontSize: 13, color: '#666' }}>O pulsa sobre el recuadro para seleccionar desde tu disco.</p>
             </div>
           )}
