@@ -16,7 +16,7 @@ export function FilterBar({ S_filt, setFilt, lookPhotos, filteredPhotos, gridCol
              <button
                key={key}
                className={`filter-btn ${active ? 'active' : ''}`}
-               title={stars === 5 ? '5 estrellas' : `${stars} estrellas o más`}
+               title={stars === 5 ? '5 stars' : `${stars} stars or more`}
                onClick={() => setFilt(active ? null : key)}
              >
                {'★'.repeat(stars)}{stars < 5 ? '+' : ''}
@@ -44,7 +44,7 @@ export function FilterBar({ S_filt, setFilt, lookPhotos, filteredPhotos, gridCol
           className={`filter-btn ${S_filt === 'notes' ? 'active' : ''}`}
           onClick={() => setFilt(S_filt === 'notes' ? null : 'notes')}
         >
-          NOTAS
+          NOTES
         </button>
 
         {S_filt && (
@@ -55,7 +55,7 @@ export function FilterBar({ S_filt, setFilt, lookPhotos, filteredPhotos, gridCol
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-tertiary)' }} title="Zoom de cuadrícula">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-tertiary)' }} title="Grid zoom">
            <Search size={14} />
            <input 
               type="range" 

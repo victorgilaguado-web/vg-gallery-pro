@@ -45,19 +45,19 @@ function LockScreen({ project, onUnlock }) {
             </div>
           </div>
           
-          <h2 style={{ fontFamily: 'Outfit', fontWeight: 300, marginBottom: 10 }}>Acceso Privado</h2>
-          <p style={{ fontSize: 13, color: '#888', marginBottom: 35 }}>Las fotografías de {project?.name || 'esta sesión'} están protegidas. Inserte la clave otorgada por el estudio.</p>
+          <h2 style={{ fontFamily: 'Outfit', fontWeight: 300, marginBottom: 10 }}>Private Access</h2>
+          <p style={{ fontSize: 13, color: '#888', marginBottom: 35 }}>The photographs of {project?.name || 'this session'} are protected. Enter the access key provided by the studio.</p>
           
           <form onSubmit={handleSubmit}>
             <input 
                type="password" 
                value={pwd}
                onChange={e => setPwd(e.target.value)}
-               placeholder="Contraseña"
+               placeholder="Password"
                style={{ width: '100%', padding: '16px', background: '#000', border: `1px solid ${err ? '#e74c3c' : '#333'}`, color: '#fff', borderRadius: 6, marginBottom: 20, textAlign: 'center', fontSize: 16, letterSpacing: 4, outline: 'none', transition: 'border 0.2s' }}
             />
             <button type="submit" disabled={loading || !pwd} style={{ width: '100%', padding: '16px', background: '#fff', color: '#000', border: 'none', borderRadius: 6, fontWeight: 600, cursor: pwd ? 'pointer' : 'not-allowed', transition: 'opacity 0.2s', opacity: (loading || !pwd) ? 0.5 : 1 }}>
-               {loading ? 'Verificando...' : 'Desbloquear Galería'}
+               {loading ? 'Verifying...' : 'Unlock Gallery'}
             </button>
           </form>
        </div>
@@ -163,7 +163,7 @@ function App() {
       );
     }
 
-    return <div style={{ height: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', color: 'var(--text-tertiary)', letterSpacing: '2px', textTransform: 'uppercase' }}>Selecciona una opción del menú</div>;
+    return <div style={{ height: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', color: 'var(--text-tertiary)', letterSpacing: '2px', textTransform: 'uppercase' }}>Select an option from the menu</div>;
   };
 
   return (

@@ -226,7 +226,7 @@ export function PhotoModal({ photo, allPhotos, onNavigate, onClose, onUpdate }) 
 
         <div className="panel-section">
           <div className="section-title">
-            Photo Rating <span style={{ textTransform: 'none', color: '#666', fontSize: '9px', marginLeft: 4 }}>(Teclas 1-5, 0 borra)</span>
+            Photo Rating <span style={{ textTransform: 'none', color: '#666', fontSize: '9px', marginLeft: 4 }}>(Keys 1-5, 0 clears)</span>
           </div>
           <div className="stars-selector">
             {[1, 2, 3, 4, 5].map(star => (
@@ -243,7 +243,7 @@ export function PhotoModal({ photo, allPhotos, onNavigate, onClose, onUpdate }) 
 
         <div className="panel-section">
           <div className="section-title">
-            Color Labels <span style={{ textTransform: 'none', color: '#666', fontSize: '9px', marginLeft: 4 }}>(Teclas 6-9)</span>
+            Color Labels <span style={{ textTransform: 'none', color: '#666', fontSize: '9px', marginLeft: 4 }}>(Keys 6-9)</span>
           </div>
           <div>
             {COLORS.map((c, i) => (
@@ -265,7 +265,7 @@ export function PhotoModal({ photo, allPhotos, onNavigate, onClose, onUpdate }) 
           <div className="section-title">User Notes</div>
           <textarea
             className="note-input"
-            placeholder="Añadir comentarios de edición..."
+            placeholder="Add editing comments..."
             value={note}
             onChange={(e) => setNote(e.target.value)}
             onBlur={autoSaveNote}
@@ -274,7 +274,7 @@ export function PhotoModal({ photo, allPhotos, onNavigate, onClose, onUpdate }) 
 
         <div className="modal-actions">
            {/* Si pulsan el botón, cerramos, porque el note ya se autoguarda onBlur */}
-           <button className="btn-primary" onClick={handleSave}>Guardar Salir</button>
+           <button className="btn-primary" onClick={handleSave}>Save & Close</button>
            <button className="btn-secondary" onClick={() => { autoSaveNote(); onClose(); }}><X size={16} /></button>
         </div>
 

@@ -80,7 +80,7 @@ export function Admin() {
 
   // --- LOGICA DE PROYECTOS MAESTRO (CRUD) ---
   const addProject = async () => {
-    const name = window.prompt("Nombre del nuevo Cliente o Sesión Comercial:");
+    const name = window.prompt("Name of the new client or commercial session:");
     if (!name || name.trim() === '') return;
     
     const cleanName = name.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
@@ -90,20 +90,20 @@ export function Admin() {
     const { data, error } = await supabase.from('projects').insert([{ name: name.trim(), slug }]).select().single();
     
     if (error) {
-       alert("Error creando proyecto. ¿Activaaste la política INSERT en tu BD?: " + error.message);
+       alert("Error creating project. Did you enable the INSERT policy in your DB?: " + error.message);
        return;
     }
     if (data) {
        const list = await loadProjects();
        setProject(data); // Saltamos a la vista en blanco de este nuevo proyecto
-       alert("¡Proyecto creado y enlace exclusivo generado!");
+       alert("Project created and private link generated!");
     }
   };
 
   const deleteProject = async () => {
     if (!project) return;
-    const word = window.prompt(`ALERTA RADIACTIVA: Escribe "BORRAR" para eliminar el proyecto "${project.name}" y PURGAR físicamente todas las fotos de tu almacenamiento (Ahorra Espacio):`);
-    if (word !== 'BORRAR') return;
+    const word = window.prompt(`DANGER ZONE: Type "DELETE" to permanently remove the project "${project.name}" and physically purge all its photos from storage (frees up space):`);
+    if (word !== 'DELETE') return;
     
     // 1. Recolectar toda la basura física que hay que purgar de la Nube
     try {
@@ -146,21 +146,21 @@ export function Admin() {
     // 3. Destruir la obra definitivamente en la Base de Datos
     const { error } = await supabase.from('projects').delete().eq('id', project.id);
     if (error) {
-       alert("Fallo borrando. Verifica que has activado DELETE en tus Policies de Supabase: " + error.message);
+       alert("Delete failed. Check that DELETE is enabled in your Supabase policies: " + error.message);
        return;
     }
     
-    alert("¡Purgado Completo! Mochila de almacenamiento liberada y proyecto destruido.");
+    alert("Purge complete! Storage space freed and project destroyed.");
     const list = await loadProjects();
     setProject(list.length > 0 ? list[0] : null);
   };
 
   const renameProject = async () => {
-    const name = window.prompt("Rebautizar el proyecto (título de la web y pestaña):", project?.name);
+    const name = window.prompt("Rename the project (website and tab title):", project?.name);
     if (!name || name.trim() === '' || name === project?.name) return;
     
     const { error } = await supabase.from('projects').update({ name: name.trim() }).eq('id', project.id);
-    if (error) alert("Error actualizando: " + error.message);
+    if (error) alert("Error updating: " + error.message);
     
     // Recargar solo para forzar actualización del título
     const { data } = await supabase.from('projects').select('*').eq('id', project.id).single();
@@ -183,16 +183,16 @@ export function Admin() {
        setProject(p);
        loadProjects();
        
-       alert('¡Logotipo del cliente actualizado con éxito!');
+       alert('Client logo updated successfully!');
     } else {
-       alert("Hubo un error subiendo el logo: " + (error?.message || JSON.stringify(error)));
+       alert("There was an error uploading the logo: " + (error?.message || JSON.stringify(error)));
     }
     setUploading(false);
   };
 
   const updatePassword = async () => {
-    const defaultMsg = project?.password ? `El proyecto está protegido actualmente por "${project.password}".` : "El proyecto es PÚBLICO y no tiene barreras.";
-    const pass = window.prompt(`${defaultMsg}\n\nEscribe el nuevo PIN o Clave secreta para proteger el acceso. Déjalo completamente en blanco (y dale a Aceptar) para desactivar el cerrojo:`, project?.password || '');
+    const defaultMsg = project?.password ? `The project is currently protected with "${project.password}".` : "The project is PUBLIC with no barriers.";
+    const pass = window.prompt(`${defaultMsg}\n\nType the new PIN or secret key to protect access. Leave it completely blank (and press OK) to disable the lock:`, project?.password || '');
     
     if (pass === null) return; // Si la cancela
     
@@ -200,39 +200,39 @@ export function Admin() {
     const finalPass = pass.trim() === '' ? null : pass.trim();
     
     const { error } = await supabase.from('projects').update({ password: finalPass }).eq('id', project.id);
-    if (error) alert("Error actualizando la clave: " + error.message);
+    if (error) alert("Error updating the key: " + error.message);
     else {
       const { data } = await supabase.from('projects').select('*').eq('id', project.id).single();
       setProject(data);
       loadProjects();
-      alert(finalPass ? `¡Galería BLINDADA! Clave actual: ${finalPass}` : "Cerradura eliminada. La galería ahora vuelve a ser pública para quien tenga la URL.");
+      alert(finalPass ? `Gallery LOCKED! Current key: ${finalPass}` : "Lock removed. The gallery is now public again for anyone with the URL.");
     }
   };
 
 
   // --- LOGICA DEL GESTOR (CRUD CARPETAS) ---
   const addDay = async () => {
-    const name = window.prompt("Nombre de la nueva Sección Maestra (Ej: Taller, Producto, Boda):");
+    const name = window.prompt("Name of the new main section (e.g. Studio, Product, Wedding):");
     if (!name || name.trim() === '') return;
     const { data } = await supabase.from('days').insert([{ name: name.trim(), project_id: project?.id }]).select().single();
     if (data) setDays(prev => [...prev, data]);
   };
   
   const renameDay = async (id, oldName) => {
-    const name = window.prompt("Escribe el nuevo nombre de esta sección:", oldName);
+    const name = window.prompt("Type the new name for this section:", oldName);
     if (!name || name.trim() === '' || name === oldName) return;
     await supabase.from('days').update({ name: name.trim() }).eq('id', id);
     loadProjectData(project);
   };
 
   const deleteDay = async (id, name) => {
-    if (!window.confirm(`⚠️ ESTO NO TIENE VUELTA ATRÁS: ¿Seguro que quieres eliminar completamente la sección grande "${name}"?`)) return;
+    if (!window.confirm(`⚠️ THIS CANNOT BE UNDONE: Are you sure you want to completely delete the section "${name}"?`)) return;
     await supabase.from('days').delete().eq('id', id);
     loadProjectData(project);
   };
 
   const addLook = async (dayId) => {
-    const name = window.prompt("Nombre de la nueva Carpeta destino (Ej: Zapatos, Noche, Exterior):");
+    const name = window.prompt("Name of the new destination folder (e.g. Shoes, Night, Outdoor):");
     if (!name || name.trim() === '') return;
     const { data } = await supabase.from('looks').insert([{ name: name.trim(), day_id: dayId }]).select().single();
     if (data) {
@@ -242,14 +242,14 @@ export function Admin() {
   };
 
   const renameLook = async (id, oldName) => {
-    const name = window.prompt("Nuevo nombre de la carpeta:", oldName);
+    const name = window.prompt("New folder name:", oldName);
     if (!name || name.trim() === '' || name === oldName) return;
     await supabase.from('looks').update({ name: name.trim() }).eq('id', id);
     loadProjectData(project);
   };
 
   const deleteLook = async (id, name) => {
-    if (!window.confirm(`⚠️ ¿Seguro que quieres eliminar la Sub-Carpeta "${name}" de manera irreversible? (Si contiene fotos, quedarán huérfanas)`)) return;
+    if (!window.confirm(`⚠️ Are you sure you want to permanently delete the sub-folder "${name}"? (Any photos inside will be orphaned)`)) return;
     await supabase.from('looks').delete().eq('id', id);
     loadProjectData(project);
   };
@@ -257,7 +257,7 @@ export function Admin() {
 
   // --- LOGICA DE SUBIDA (SUBMIT FILES MULTIUSO) ---
   const handleFiles = async (files) => {
-    if (!selectedLook) return alert("Selecciona primero una carpeta destino o la opción de Moodboard.");
+    if (!selectedLook) return alert("First select a destination folder or the Moodboard option.");
     if (files.length === 0) return;
     
     setUploading(true);
@@ -279,7 +279,7 @@ export function Admin() {
         ]);
       } else {
         console.error("Error subiendo ", file.name, uploadError);
-        alert("Fallo subiendo foto: " + uploadError?.message);
+        alert("Photo upload failed: " + uploadError?.message);
       }
       
       done++;
@@ -288,7 +288,7 @@ export function Admin() {
     
     setUploading(false);
     setProgress(0);
-    alert('¡Imágenes volcadas y sincronizadas correctamente en esta obra!');
+    alert('Images uploaded and synced successfully!');
   };
 
   const handleDrop = (e) => {
@@ -318,7 +318,7 @@ export function Admin() {
   };
 
   const deletePhoto = async (photoId, photoUrl) => {
-     if (!window.confirm('⚠️ ALERTA: ¿Seguro que quieres borrar esta foto DEFINITIVAMENTE de los servidores y la galería?')) return;
+     if (!window.confirm('⚠️ WARNING: Are you sure you want to PERMANENTLY delete this photo from the servers and the gallery?')) return;
      
      try {
        // Purge from storage
@@ -333,7 +333,7 @@ export function Admin() {
      
      const { error } = await supabase.from('photos').delete().eq('id', photoId);
      if (error) {
-       alert("Error borrando foto de la Base de Datos: " + error.message);
+       alert("Error deleting photo from the database: " + error.message);
      } else {
        setFolderPhotos(prev => prev.filter(p => p.id !== photoId));
      }
@@ -348,7 +348,7 @@ export function Admin() {
           <h2 style={{ fontFamily: 'Outfit', fontWeight: 300, marginBottom: 20 }}>Centro de Mando</h2>
           <input 
             type="password" 
-            placeholder="Clave Secundaria" 
+            placeholder="Access Key" 
             value={pass} 
             onChange={e => setPass(e.target.value)}
             style={{ padding: '12px', background: '#111', border: '1px solid #333', color: '#fff', borderRadius: 4, marginRight: 10, width: 200 }}
@@ -370,7 +370,7 @@ export function Admin() {
       <div style={{ background: '#18181b', padding: '20px 30px', borderRadius: 8, marginBottom: 30, border: '1px solid #3f3f46', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
          <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
            <div>
-              <label style={{ fontSize: 11, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 6 }}>Centro Multi-Clientes</label>
+              <label style={{ fontSize: 11, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 6 }}>Multi-Client Hub</label>
               <select 
                 value={project?.id || ''}
                 onChange={e => {
@@ -388,12 +388,12 @@ export function Admin() {
              onClick={addProject}
              style={{ background: 'transparent', color: '#fff', border: '1px dashed #52525b', padding: '10px 16px', borderRadius: 6, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, marginTop: 17 }}
            >
-             <Plus size={16} /> Crear Sesión/Cliente
+             <Plus size={16} /> New Session/Client
            </button>
          </div>
 
          <button onClick={deleteProject} style={{ background: 'transparent', color: '#ef4444', border: '1px solid #ef4444', padding: '8px 14px', borderRadius: 6, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, marginTop: 17 }}>
-           <Trash2 size={14} /> Destruir Proyecto
+           <Trash2 size={14} /> Delete Project
          </button>
       </div>
 
@@ -402,34 +402,34 @@ export function Admin() {
       <div style={{ background: '#111', padding: '30px', borderRadius: 8, marginBottom: 40, border: '1px solid #222' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
           <Settings size={20} color="#3498DB" />
-          <h2 style={{ fontSize: 18, fontWeight: 500, margin: 0 }}>Ajustes Maestros de la Sesión</h2>
+          <h2 style={{ fontSize: 18, fontWeight: 500, margin: 0 }}>Session Master Settings</h2>
         </div>
         
         <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr) 1.5fr', gap: 30, marginBottom: 30 }}>
            
            <div>
-             <label style={{ fontSize: 13, color: '#aaa', display: 'block', marginBottom: 8 }}>Título Oficial Web</label>
+             <label style={{ fontSize: 13, color: '#aaa', display: 'block', marginBottom: 8 }}>Official Web Title</label>
              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{project?.name || '...'}</h3>
-               <button onClick={renameProject} style={{ background: '#222', border: '1px solid #444', color: '#eee', padding: '6px 12px', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>Editar</button>
+               <button onClick={renameProject} style={{ background: '#222', border: '1px solid #444', color: '#eee', padding: '6px 12px', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>Edit</button>
              </div>
            </div>
 
            <div>
-             <label style={{ fontSize: 13, color: '#aaa', display: 'block', marginBottom: 8 }}>Logotipo Co-Branding</label>
+             <label style={{ fontSize: 13, color: '#aaa', display: 'block', marginBottom: 8 }}>Co-Branding Logo</label>
              <div style={{ display: 'flex', alignItems: 'center', gap: 15 }}>
-               {project?.client_logo ? <img src={project.client_logo} alt="Logo" style={{ height: 35, objectFit: 'contain', background: '#fff', padding: 5, borderRadius: 4 }} /> : <span style={{color: '#666', fontSize: 13}}>Añadir logo →</span>}
+               {project?.client_logo ? <img src={project.client_logo} alt="Logo" style={{ height: 35, objectFit: 'contain', background: '#fff', padding: 5, borderRadius: 4 }} /> : <span style={{color: '#666', fontSize: 13}}>Add logo →</span>}
                
                <input type="file" id="clientLogoUpload" accept="image/*" style={{display: 'none'}} onChange={(e) => uploadClientLogo(e.target.files[0])} />
                <button onClick={() => document.getElementById('clientLogoUpload').click()} style={{ display: 'flex', alignItems: 'center', gap: 5, background: '#222', border: '1px solid #444', color: '#eee', padding: '6px 12px', borderRadius: 4, cursor: 'pointer', fontSize: 12 }}>
-                 <ImageIcon size={14} /> Subir Logo
+                 <ImageIcon size={14} /> Upload Logo
                </button>
              </div>
            </div>
 
            <div style={{ background: '#09090b', padding: '15px 20px', borderRadius: 6, border: '1px solid #3f3f46' }}>
               <label style={{ fontSize: 11, color: '#3498DB', textTransform: 'uppercase', letterSpacing: 1, display: 'flex', alignItems: 'center', gap: 5, marginBottom: 8 }}>
-                 <LinkIcon size={12} /> Link Privado del Cliente
+                 <LinkIcon size={12} /> Client Private Link
               </label>
               <a href={projectUrl} target="_blank" rel="noreferrer" style={{ color: '#fff', fontSize: 15, textDecoration: 'none', background: '#27272a', padding: '8px 12px', borderRadius: 4, display: 'inline-block', width: '100%', wordBreak: 'break-all' }}>
                  {projectUrl}
@@ -445,14 +445,14 @@ export function Admin() {
                 <LinkIcon size={18} />
               </div>
               <div>
-                <h4 style={{ margin: 0, fontSize: 15, fontWeight: 500 }}>Cerrojo de Privacidad</h4>
+                <h4 style={{ margin: 0, fontSize: 15, fontWeight: 500 }}>Privacy Lock</h4>
                 <p style={{ margin: 0, fontSize: 12, color: '#888', marginTop: 4 }}>
-                   {project?.password ? `Protegido. El cliente debe teclear el PIN para entrar.` : `Desactivado. Web pública con acceso directo vía URL.`}
+                   {project?.password ? `Protected. The client must enter the PIN to get in.` : `Disabled. Public site with direct URL access.`}
                 </p>
               </div>
            </div>
            <button onClick={updatePassword} style={{ background: project?.password ? '#e74c3c' : 'transparent', border: project?.password ? 'none' : '1px solid #555', color: project?.password ? '#fff' : '#ccc', padding: '10px 20px', borderRadius: 6, fontSize: 13, cursor: 'pointer', fontWeight: 500, transition: 'all 0.2s' }}>
-             {project?.password ? 'Desactivar Cerrojo' : 'Activar PIN de Seguridad'}
+             {project?.password ? 'Disable Lock' : 'Enable Security PIN'}
            </button>
         </div>
 
@@ -461,16 +461,16 @@ export function Admin() {
       {/* 2. SECCIÓN DE ESTRUCTURA Y CARPETAS */}
       <div style={{ background: '#111', padding: '30px', borderRadius: 8, marginBottom: 40, border: '1px solid #222' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-          <h2 style={{ fontSize: 18, fontWeight: 500 }}>El Árbol de Secciones y Carpetas</h2>
+          <h2 style={{ fontSize: 18, fontWeight: 500 }}>Sections & Folders Tree</h2>
           <button 
             onClick={addDay}
             style={{ display: 'flex', alignItems: 'center', gap: 6, background: '#3498DB', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 4, cursor: 'pointer', fontSize: 12, fontWeight: 500 }}
           >
-            <Plus size={14} /> Nueva Sección Principal
+            <Plus size={14} /> New Main Section
           </button>
         </div>
 
-        {days.length === 0 ? <p style={{color:'#666', fontSize:13}}>No tienes secciones creadas aún para esta sesión.</p> : null}
+        {days.length === 0 ? <p style={{color:'#666', fontSize:13}}>No sections created yet for this session.</p> : null}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           {days.map(day => {
@@ -495,9 +495,9 @@ export function Admin() {
                          <span style={{fontSize: 13, color: '#ccc'}}>{look.name}</span>
                       </div>
                       <div style={{ display: 'flex', gap: 8 }}>
-                         <button onClick={() => loadLookPhotos(look)} style={{ background: 'transparent', border: 'none', color: '#aaa', cursor: 'pointer', padding: 0 }} title="Ver Fotos"><Eye size={14} /></button>
-                         <button onClick={() => renameLook(look.id, look.name)} style={{ background: 'transparent', border: 'none', color: '#555', cursor: 'pointer', padding: 0 }} title="Renombrar"><Edit2 size={14} /></button>
-                         <button onClick={() => deleteLook(look.id, look.name)} style={{ background: 'transparent', border: 'none', color: '#c0392b', cursor: 'pointer', padding: 0 }} title="Eliminar"><Trash2 size={14} /></button>
+                         <button onClick={() => loadLookPhotos(look)} style={{ background: 'transparent', border: 'none', color: '#aaa', cursor: 'pointer', padding: 0 }} title="View Photos"><Eye size={14} /></button>
+                         <button onClick={() => renameLook(look.id, look.name)} style={{ background: 'transparent', border: 'none', color: '#555', cursor: 'pointer', padding: 0 }} title="Rename"><Edit2 size={14} /></button>
+                         <button onClick={() => deleteLook(look.id, look.name)} style={{ background: 'transparent', border: 'none', color: '#c0392b', cursor: 'pointer', padding: 0 }} title="Delete"><Trash2 size={14} /></button>
                       </div>
                     </div>
                   ))}
@@ -519,22 +519,22 @@ export function Admin() {
 
       {/* 3. ZONA DE UPLOAD */}
       <div style={{ background: '#111', padding: '30px', borderRadius: 8, border: '1px solid #222' }}>
-         <h2 style={{ fontSize: 18, fontWeight: 500, marginBottom: 20 }}>Motor de Envíos Masivos</h2>
+         <h2 style={{ fontSize: 18, fontWeight: 500, marginBottom: 20 }}>Bulk Upload Engine</h2>
          
           <div style={{ marginBottom: 20 }}>
-            <label style={{ fontSize: 13, color: '#aaa', display: 'block', marginBottom: 8 }}>¿A dónde van a ir estas carpetas en {project?.name}?</label>
+            <label style={{ fontSize: 13, color: '#aaa', display: 'block', marginBottom: 8 }}>Where should these uploads go in {project?.name}?</label>
             <select 
               value={selectedLook} 
               onChange={e => setSelectedLook(e.target.value)}
               style={{ background: '#0a0a0a', color: '#fff', border: '1px solid #444', padding: '14px 12px', borderRadius: 6, width: '100%', maxWidth: '400px', cursor: 'pointer', fontSize: 15 }}
             >
               
-              <option value="" disabled>─ Carpetas de Galería ─</option>
+              <option value="" disabled>─ Gallery Folders ─</option>
               {days.map(d => {
                  const lks = looks.filter(l => l.day_id === d.id);
                  if(lks.length > 0) {
                      return (
-                       <optgroup key={d.id} label={`↳ Día: ${d.name}`}>
+                       <optgroup key={d.id} label={`↳ Day: ${d.name}`}>
                           {lks.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
                        </optgroup>
                      )
@@ -579,7 +579,7 @@ export function Admin() {
             </div>
           ) : (
             <div>
-              <h3 style={{ fontWeight: 400, color: '#ccc', marginBottom: 10 }}>Arrastra las imágenes para la Carpeta aquí</h3>
+              <h3 style={{ fontWeight: 400, color: '#ccc', marginBottom: 10 }}>Drag the images for this folder here</h3>
               <p style={{ fontSize: 13, color: '#666' }}>O pulsa sobre el recuadro para seleccionar desde tu disco.</p>
             </div>
           )}
@@ -605,9 +605,9 @@ export function Admin() {
            </div>
            
            {loadingPhotos ? (
-              <p style={{ color: '#aaa', textAlign: 'center', marginTop: 100 }}>Cargando fotos del servidor...</p>
+              <p style={{ color: '#aaa', textAlign: 'center', marginTop: 100 }}>Loading photos from the server...</p>
            ) : folderPhotos.length === 0 ? (
-              <p style={{ color: '#aaa', textAlign: 'center', marginTop: 100 }}>No hay fotos en esta carpeta.</p>
+              <p style={{ color: '#aaa', textAlign: 'center', marginTop: 100 }}>No photos in this folder.</p>
            ) : (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 15 }}>
                  {folderPhotos.map(p => {
@@ -621,7 +621,7 @@ export function Admin() {
                          <button 
                             onClick={() => deletePhoto(p.id, p.url)}
                             style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(231, 76, 60, 0.9)', color: '#fff', border: 'none', borderRadius: '50%', width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 4px 6px rgba(0,0,0,0.3)', transition: 'all 0.2s' }}
-                            title="Eliminar Foto"
+                            title="Delete Photo"
                             onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.1)'}
                             onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
                          >

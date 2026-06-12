@@ -91,7 +91,7 @@ export function GalleryGrid({ photos, onUpdatePhoto, gridCols }) {
   }, [photos, activeId, selPhotoId, comparing, comparePhotos.length, gridCols, onUpdatePhoto]);
 
   if (!photos || photos.length === 0) {
-    return <div style={{ textAlign: 'center', padding: '48px', fontSize: '11px', color: '#555', letterSpacing: '2px', textTransform: 'uppercase' }}>Sin fotos</div>;
+    return <div style={{ textAlign: 'center', padding: '48px', fontSize: '11px', color: '#555', letterSpacing: '2px', textTransform: 'uppercase' }}>No photos</div>;
   }
 
   const toggleCompare = (pid) => {
@@ -166,15 +166,15 @@ export function GalleryGrid({ photos, onUpdatePhoto, gridCols }) {
       {/* Barra flotante de comparación */}
       {comparePhotos.length >= 1 && !comparing && (
         <div className="compare-bar">
-          <span className="compare-bar-count">{comparePhotos.length} seleccionada{comparePhotos.length !== 1 ? 's' : ''}</span>
-          <span className="compare-bar-hint">Cmd+clic para añadir</span>
+          <span className="compare-bar-count">{comparePhotos.length} selected</span>
+          <span className="compare-bar-hint">Cmd+click to add</span>
           {comparePhotos.length >= 2 && (
             <button className="btn-primary compare-bar-btn" onClick={() => setComparing(true)}>
-              Comparar (C)
+              Compare (C)
             </button>
           )}
           <button className="btn-secondary compare-bar-btn" onClick={() => setCompareIds([])}>
-            Limpiar
+            Clear
           </button>
         </div>
       )}

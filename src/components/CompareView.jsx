@@ -55,8 +55,8 @@ export function CompareView({ photos, onUpdatePhoto, onClose, onRemove }) {
   return (
     <div className="compare-overlay">
       <div className="compare-topbar">
-        <span className="compare-title">Comparar · {photos.length} fotos</span>
-        <span className="compare-hint">Clic en una foto para activarla · 1-5 estrellas · 6-9 color · Z zoom · Esc salir</span>
+        <span className="compare-title">Compare · {photos.length} photos</span>
+        <span className="compare-hint">Click a photo to activate it · 1-5 stars · 6-9 color · Z zoom · Esc to exit</span>
         <button className="btn-secondary" onClick={onClose}><X size={16} /></button>
       </div>
 
@@ -77,7 +77,7 @@ export function CompareView({ photos, onUpdatePhoto, onClose, onRemove }) {
                 {col >= 0 && <div className="color-dot" style={{ background: COLORS[col] }}></div>}
                 <button
                   className="compare-remove"
-                  title="Quitar de la comparación"
+                  title="Remove from comparison"
                   onClick={(e) => { e.stopPropagation(); onRemove(p.id); }}
                 >
                   <X size={13} />

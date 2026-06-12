@@ -43,7 +43,7 @@ export function Header({ project, photosCount, daysCount, totalStarred, totalSel
             </h1>
           )}
           <div className="project-meta">
-            {photosCount} photos · {daysCount} días
+            {photosCount} photos · {daysCount} days
           </div>
         </div>
       </div>

@@ -120,7 +120,7 @@ export function useGalleryData() {
         const pid = await getProjectId();
         const { data: project } = await supabase.from('projects').select('*').eq('id', pid).single();
         
-        if (!project) throw new Error("Proyecto no encontrado");
+        if (!project) throw new Error("Project not found");
 
         // Analizar Cerrojo de Privacidad (el admin entra con su propia vista)
         const sessionAuth = sessionStorage.getItem(`vg_auth_${project.id}`);
@@ -138,7 +138,7 @@ export function useGalleryData() {
 
       } catch (err) {
         console.error("Error fetching project:", err);
-        setError("Error cargando la galería o enlace caducado.");
+        setError("Error loading the gallery or the link has expired.");
         setLoading(false);
       }
     };

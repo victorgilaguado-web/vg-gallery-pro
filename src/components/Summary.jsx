@@ -30,7 +30,7 @@ export function Summary({ photos=[], onUpdatePhoto }) {
     { label: 'Retouch', count: rt },
     { label: 'Discard', count: rc },
     { label: 'Review', count: vc },
-    { label: 'Notas', count: noted },
+    { label: 'Notes', count: noted },
   ];
 
   const sfPhotos = React.useMemo(() => {
@@ -100,7 +100,7 @@ export function Summary({ photos=[], onUpdatePhoto }) {
            style={{ border: '1px solid var(--border-color)', borderRadius: 'var(--radius-full)' }}
            onClick={() => setSf(sf === 'notes' ? null : 'notes')}
          >
-           ✏ Notas ({noted})
+           ✏ Notes ({noted})
          </button>
 
          {sf && (
@@ -112,7 +112,7 @@ export function Summary({ photos=[], onUpdatePhoto }) {
 
       {sf === 'notes' ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', background: 'var(--bg-base)' }}>
-           {sfPhotos.length === 0 && <div style={{ padding: '40px', color: 'var(--text-tertiary)', textAlign: 'center', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '2px' }}>Sin Notas</div>}
+           {sfPhotos.length === 0 && <div style={{ padding: '40px', color: 'var(--text-tertiary)', textAlign: 'center', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '2px' }}>No Notes</div>}
            {sfPhotos.map(p => {
              const col = p.color == null ? -1 : parseInt(p.color);
              return (
