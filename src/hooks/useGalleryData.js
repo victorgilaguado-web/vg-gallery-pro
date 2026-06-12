@@ -122,9 +122,10 @@ export function useGalleryData() {
         
         if (!project) throw new Error("Proyecto no encontrado");
 
-        // Analizar Cerrojo de Privacidad
+        // Analizar Cerrojo de Privacidad (el admin entra con su propia vista)
         const sessionAuth = sessionStorage.getItem(`vg_auth_${project.id}`);
-        if (false) {
+        const isAdminRoute = window.location.pathname === '/admin';
+        if (project.password && sessionAuth !== 'true' && !isAdminRoute) {
            // Interceptar la descarga, bloquear app
            setData(prev => ({ ...prev, project }));
            setLocked(true);

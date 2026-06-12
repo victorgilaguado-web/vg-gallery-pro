@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { GalleryGrid } from './GalleryGrid';
 import { X } from 'lucide-react';
 
-const COLORS = ['#E74C3C', '#F39C12', '#2ECC71'];
-const CLABELS = ['Reject', 'Review', 'Select'];
+const COLORS = ['#E74C3C', '#F39C12', '#3498DB', '#2ECC71'];
+const CLABELS = ['Discard', 'Review', 'Retouch', 'Select'];
 
 function thumb(url, w=800) {
   if (!url) return '';
@@ -18,7 +18,8 @@ export function Summary({ photos=[], onUpdatePhoto }) {
 
   const rc = photos.filter(p => parseInt(p.color) === 0).length;
   const vc = photos.filter(p => parseInt(p.color) === 1).length;
-  const sel = photos.filter(p => parseInt(p.color) === 2).length;
+  const rt = photos.filter(p => parseInt(p.color) === 2).length;
+  const sel = photos.filter(p => parseInt(p.color) === 3).length;
   const starred = photos.filter(p => parseInt(p.stars) > 0).length;
   const noted = photos.filter(p => p.note && p.note.trim()).length;
 
@@ -26,7 +27,8 @@ export function Summary({ photos=[], onUpdatePhoto }) {
     { label: 'Total', count: photos.length },
     { label: '★ Stars', count: starred },
     { label: '● Select', count: sel },
-    { label: 'Reject', count: rc },
+    { label: 'Retouch', count: rt },
+    { label: 'Discard', count: rc },
     { label: 'Review', count: vc },
     { label: 'Notas', count: noted },
   ];
@@ -36,14 +38,11 @@ export function Summary({ photos=[], onUpdatePhoto }) {
     return photos.filter(p => {
       const st = parseInt(p.stars) || 0;
       const col = p.color == null ? -1 : parseInt(p.color);
-      if (sf === 's5') return st === 5;
-      if (sf === 's4') return st === 4;
-      if (sf === 's3') return st === 3;
-      if (sf === 's2') return st === 2;
-      if (sf === 's1') return st === 1;
+      if (sf[0] === 's') return st === parseInt(sf[1]);
       if (sf === 'c0') return col === 0;
       if (sf === 'c1') return col === 1;
       if (sf === 'c2') return col === 2;
+      if (sf === 'c3') return col === 3;
       if (sf === 'notes') return !!(p.note && p.note.trim());
       return false;
     });
@@ -131,7 +130,7 @@ export function Summary({ photos=[], onUpdatePhoto }) {
            })}
         </div>
       ) : sf ? (
-        <GalleryGrid photos={sfPhotos} onUpdatePhoto={onUpdatePhoto} />
+        <GalleryGrid photos={sfPhotos} onUpdatePhoto={onUpdatePhoto} gridCols={4} />
       ) : null}
 
     </div>

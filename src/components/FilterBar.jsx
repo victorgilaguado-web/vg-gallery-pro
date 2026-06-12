@@ -13,12 +13,13 @@ export function FilterBar({ S_filt, setFilt, lookPhotos, filteredPhotos, gridCol
           const key = `s${stars}`;
           const active = S_filt === key;
           return (
-             <button 
-               key={key} 
+             <button
+               key={key}
                className={`filter-btn ${active ? 'active' : ''}`}
+               title={stars === 5 ? '5 estrellas' : `${stars} estrellas o más`}
                onClick={() => setFilt(active ? null : key)}
              >
-               {'★'.repeat(stars)}
+               {'★'.repeat(stars)}{stars < 5 ? '+' : ''}
              </button>
           )
         })}

@@ -113,7 +113,7 @@ function App() {
   }
 
   const totalStarred = photos.filter(p => parseInt(p.stars) > 0).length;
-  const totalSel = photos.filter(p => parseInt(p.color) === 2).length;
+  const totalSel = photos.filter(p => parseInt(p.color) === 3).length;
 
   if (locked) {
      return <LockScreen project={project} onUnlock={validatePassword} />;
@@ -145,11 +145,8 @@ function App() {
       const filteredPhotos = filter ? lookPhotos.filter(p => {
         const st = parseInt(p.stars) || 0;
         const col = p.color == null ? -1 : parseInt(p.color);
-        if (filter === 's5') return st === 5;
-        if (filter === 's4') return st === 4;
-        if (filter === 's3') return st === 3;
-        if (filter === 's2') return st === 2;
-        if (filter === 's1') return st === 1;
+        // Estrellas: filtro "N o más", como el filtro por defecto de Capture One
+        if (filter[0] === 's') return st >= parseInt(filter[1]);
         if (filter === 'c0') return col === 0;
         if (filter === 'c1') return col === 1;
         if (filter === 'c2') return col === 2;
