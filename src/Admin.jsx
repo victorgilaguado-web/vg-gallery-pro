@@ -238,55 +238,60 @@ export function Admin() {
 -- Generated ${new Date().toLocaleString('en-GB')}
 --
 -- HOW TO USE
--- 1. Open your Capture One catalog/session and click the album/collection with these photos.
+-- 1. Open your Capture One session and click the album/collection with these photos.
 -- 2. In Script Editor (this window) press the Run button.
 -- 3. Star ratings and color tags are applied to the matching photos by filename.
---
--- If your Capture One app has a versioned name (e.g. "Capture One 23"),
--- change it on the two 'tell application "Capture One"' lines below.
+--    (Capture One is detected automatically, whatever version you have.)
 
 use framework "Foundation"
 use scripting additions
 
 set theData to {${recs.join(', ')}}
 
-tell application "Capture One"
-  tell current document
-    set allNames to name of every variant
-  end tell
-end tell
+set coName to my findCO()
 
--- Build a normalized name -> index lookup (fast, native)
+-- Read every variant name from the open Capture One document
+-- (run script compiles against the live app, so the version name never matters)
+set allNames to (run script "tell application \\"" & coName & "\\" to tell current document to get name of every variant")
+
+-- Native, fast name -> index lookup (case- and extension-insensitive)
 set d to current application's NSMutableDictionary's dictionary()
 repeat with i from 1 to (count of allNames)
   (d's setObject:i forKey:(my norm(item i of allNames)))
 end repeat
 
-set toApply to {}
-set missingList to {}
+-- Resolve matches and compose one batch of commands
+set lf to linefeed
+set body to ""
+set matched to 0
+set missingCount to 0
 repeat with rec in theData
   set idxObj to (d's objectForKey:(my norm(nm of rec)))
   if idxObj is missing value then
-    set end of missingList to (nm of rec)
+    set missingCount to missingCount + 1
   else
-    set end of toApply to {ix:(idxObj as integer), rt:(rt of rec), ct:(ct of rec)}
+    set ix to (idxObj as integer)
+    if (rt of rec) > 0 then set body to body & "set rating of variant " & ix & " to " & (rt of rec) & lf
+    if (ct of rec) is not -1 then set body to body & "set color tag of variant " & ix & " to " & (ct of rec) & lf
+    set matched to matched + 1
   end if
 end repeat
 
-tell application "Capture One"
-  tell current document
-    repeat with a in toApply
-      try
-        if (rt of a) > 0 then set rating of variant (ix of a) to (rt of a)
-        if (ct of a) is not -1 then set color tag of variant (ix of a) to (ct of a)
-      end try
-    end repeat
-  end tell
-end tell
+if body is not "" then
+  run script ("tell application \\"" & coName & "\\"" & lf & "tell current document" & lf & body & "end tell" & lf & "end tell")
+end if
 
-set msg to ((count of toApply) as text) & " photos updated in Capture One."
-if (count of missingList) > 0 then set msg to msg & return & ((count of missingList) as text) & " were not found in the open document (check you selected the right album)."
+set msg to (matched as text) & " photos updated in Capture One (" & coName & ")."
+if missingCount > 0 then set msg to msg & lf & (missingCount as text) & " were not found in the open session (check the right album is selected)."
 display dialog msg buttons {"OK"} default button "OK" with title "VG Studio -> Capture One"
+
+on findCO()
+  tell application "System Events"
+    set ns to (name of (every process whose name contains "Capture One"))
+  end tell
+  if ns is {} then error "Capture One isn't running. Open your session first, then run this script again."
+  return item 1 of ns
+end findCO
 
 on norm(t)
   set s to current application's NSString's stringWithString:t
@@ -302,7 +307,7 @@ end norm
     a.download = `CaptureOne_${(project?.name || 'sync').replace(/[^a-z0-9]+/gi, '_')}_${exportReviewer}.applescript`;
     a.click();
     URL.revokeObjectURL(a.href);
-    await dialogAlert(`Script downloaded with ${recs.length} photos.\n\nOpen it (it launches Script Editor), make sure your Capture One catalog is open with the right album selected, and press Run. Stars and color tags will be applied to the matching files.`, 'Capture One sync ready');
+    await dialogAlert(`Script downloaded with ${recs.length} photos.\n\nOpen it (it launches Script Editor), make sure your Capture One session is open with the right album selected, and press Run. Stars and color tags will be applied to the matching files automatically.`, 'Capture One sync ready');
   };
 
   const initializeAdmin = async () => {
