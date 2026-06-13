@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabase';
-import { Edit2, Plus, Folder, Calendar, Trash2, Settings, Image as ImageIcon, Link as LinkIcon, Eye, Inbox, ClipboardCopy, FileDown, Printer, RefreshCw } from 'lucide-react';
+import { Edit2, Plus, Folder, Calendar, Trash2, Settings, Image as ImageIcon, Link as LinkIcon, Eye, Inbox, ClipboardCopy, FileDown, Printer, RefreshCw, Aperture } from 'lucide-react';
 import { DialogHost, dialogAlert, dialogConfirm, dialogPrompt } from './components/Dialogs';
 
 // Miniatura JPEG (~1200px lado largo) generada en el navegador antes de subir
@@ -211,6 +211,98 @@ export function Admin() {
     if (!w) return dialogAlert('The browser blocked the pop-up. Allow pop-ups for this site and try again.', 'Pop-up blocked');
     w.document.write(html);
     w.document.close();
+  };
+
+  // Genera un AppleScript que aplica estrellas (rating) y etiquetas de color
+  // del revisor sobre el documento abierto de Capture One, emparejando por nombre.
+  // Mapeo de color VG → Capture One: Discard→rojo(1), Review→naranja(2), Retouch→azul(5), Select→verde(4)
+  const downloadCaptureOneScript = async () => {
+    const byId = Object.fromEntries(selectionData.photos.map(p => [p.id, p]));
+    const C1COLOR = { 0: 1, 1: 2, 2: 5, 3: 4 };
+    const recs = selectionData.reviews
+      .filter(r => r.reviewer === exportReviewer && ((parseInt(r.stars) || 0) > 0 || r.color != null))
+      .map(r => {
+        const p = byId[r.photo_id];
+        if (!p) return null;
+        const nm = exportName(p).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+        const rt = parseInt(r.stars) || 0;
+        const ct = r.color == null ? -1 : (C1COLOR[parseInt(r.color)] ?? -1);
+        return `{nm:"${nm}", rt:${rt}, ct:${ct}}`;
+      })
+      .filter(Boolean);
+
+    if (!recs.length) return dialogAlert('No stars or color labels to sync for this reviewer.', 'Nothing to sync');
+
+    const script = `-- VG Studio -> Capture One sync
+-- Project: ${(project?.name || '').replace(/-/g, ' ')}   Reviewer: ${exportReviewer}
+-- Generated ${new Date().toLocaleString('en-GB')}
+--
+-- HOW TO USE
+-- 1. Open your Capture One catalog/session and click the album/collection with these photos.
+-- 2. In Script Editor (this window) press the Run button.
+-- 3. Star ratings and color tags are applied to the matching photos by filename.
+--
+-- If your Capture One app has a versioned name (e.g. "Capture One 23"),
+-- change it on the two 'tell application "Capture One"' lines below.
+
+use framework "Foundation"
+use scripting additions
+
+set theData to {${recs.join(', ')}}
+
+tell application "Capture One"
+  tell current document
+    set allNames to name of every variant
+  end tell
+end tell
+
+-- Build a normalized name -> index lookup (fast, native)
+set d to current application's NSMutableDictionary's dictionary()
+repeat with i from 1 to (count of allNames)
+  (d's setObject:i forKey:(my norm(item i of allNames)))
+end repeat
+
+set toApply to {}
+set missingList to {}
+repeat with rec in theData
+  set idxObj to (d's objectForKey:(my norm(nm of rec)))
+  if idxObj is missing value then
+    set end of missingList to (nm of rec)
+  else
+    set end of toApply to {ix:(idxObj as integer), rt:(rt of rec), ct:(ct of rec)}
+  end if
+end repeat
+
+tell application "Capture One"
+  tell current document
+    repeat with a in toApply
+      try
+        if (rt of a) > 0 then set rating of variant (ix of a) to (rt of a)
+        if (ct of a) is not -1 then set color tag of variant (ix of a) to (ct of a)
+      end try
+    end repeat
+  end tell
+end tell
+
+set msg to ((count of toApply) as text) & " photos updated in Capture One."
+if (count of missingList) > 0 then set msg to msg & return & ((count of missingList) as text) & " were not found in the open document (check you selected the right album)."
+display dialog msg buttons {"OK"} default button "OK" with title "VG Studio -> Capture One"
+
+on norm(t)
+  set s to current application's NSString's stringWithString:t
+  set s to s's lastPathComponent()
+  set s to s's stringByDeletingPathExtension()
+  return (s's lowercaseString()) as text
+end norm
+`;
+
+    const blob = new Blob([script], { type: 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `CaptureOne_${(project?.name || 'sync').replace(/[^a-z0-9]+/gi, '_')}_${exportReviewer}.applescript`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    await dialogAlert(`Script downloaded with ${recs.length} photos.\n\nOpen it (it launches Script Editor), make sure your Capture One catalog is open with the right album selected, and press Run. Stars and color tags will be applied to the matching files.`, 'Capture One sync ready');
   };
 
   const initializeAdmin = async () => {
@@ -712,6 +804,9 @@ export function Admin() {
               </button>
               <button onClick={openContactSheet} style={{ display: 'flex', alignItems: 'center', gap: 7, background: '#222', color: '#eee', border: '1px solid #444', padding: '10px 16px', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
                 <Printer size={14} /> Contact sheet (PDF)
+              </button>
+              <button onClick={downloadCaptureOneScript} title="Apply stars + color tags straight into the open Capture One document" style={{ display: 'flex', alignItems: 'center', gap: 7, background: '#2ECC71', color: '#000', border: 'none', padding: '10px 16px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                <Aperture size={14} /> Sync to Capture One
               </button>
             </div>
           )}
