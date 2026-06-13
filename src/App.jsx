@@ -115,7 +115,7 @@ function Onboarding({ onClose }) {
 }
 
 function App() {
-  const { project, days, looks, photos, moodboard, loading, error, locked, reviewer, sendState, setReviewer, validatePassword, updatePhoto, updateProject } = useGalleryData();
+  const { project, days, looks, photos, moodboard, loading, error, locked, reviewer, sendState, unsaved, setReviewer, validatePassword, updatePhoto, updateProject } = useGalleryData();
   const [showOnboarding, setShowOnboarding] = useState(false);
 
   const [activeDay, setActiveDay] = useState(null);
@@ -243,6 +243,7 @@ function App() {
         reviewer={reviewer}
         reviewedCount={reviewedCount}
         sendState={sendState}
+        unsaved={unsaved}
         onChangeReviewer={setReviewer}
         onUpdateProject={updateProject}
       />

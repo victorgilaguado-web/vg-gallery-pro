@@ -1060,3 +1060,5 @@ textarea.note-input:focus {
 @media (max-width: 768px) {
   .autosave-chip { padding: 6px 10px; font-size: 10px; }
 }
+
+.autosave-chip.offline { color: #F39C12; border-color: rgba(243, 156, 18, 0.4); }

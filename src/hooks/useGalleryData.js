@@ -328,6 +328,40 @@ export function useGalleryData() {
     };
   }, [flushSubmission]);
 
+  // Guardado resiliente: una marca NUNCA se pierde aunque falle la red.
+  // Cola por foto (gana la última) que se reintenta con backoff y al reconectar.
+  const pendingWrites = useRef(new Map()); // photo_id -> row
+  const [unsaved, setUnsaved] = useState(0);
+
+  const persistReview = useCallback(async (row, attempt = 0) => {
+    const { error } = await supabase.from('photo_reviews').upsert(row, { onConflict: 'photo_id,reviewer' });
+    if (!error) {
+      // Si esta era la última versión pendiente de esa foto, sácala de la cola
+      if (pendingWrites.current.get(row.photo_id) === row) {
+        pendingWrites.current.delete(row.photo_id);
+        setUnsaved(pendingWrites.current.size);
+      }
+      return;
+    }
+    // Falló: guardar la última versión y reintentar (3 intentos con backoff)
+    pendingWrites.current.set(row.photo_id, row);
+    setUnsaved(pendingWrites.current.size);
+    if (attempt < 3) {
+      setTimeout(() => {
+        if (pendingWrites.current.get(row.photo_id) === row) persistReview(row, attempt + 1);
+      }, 1000 * (attempt + 1));
+    }
+  }, []);
+
+  // Reintentar todo lo pendiente al recuperar conexión
+  useEffect(() => {
+    const onOnline = () => {
+      pendingWrites.current.forEach(row => persistReview(row));
+    };
+    window.addEventListener('online', onOnline);
+    return () => window.removeEventListener('online', onOnline);
+  }, [persistReview]);
+
   // Las marcas van a photo_reviews (una fila por foto+revisor), no a la tabla photos
   const updatePhoto = async (id, patch) => {
     if (!reviewer) return;
@@ -347,7 +381,8 @@ export function useGalleryData() {
       note: merged.note ?? '',
       updated_at: new Date().toISOString()
     };
-    await supabase.from('photo_reviews').upsert(row, { onConflict: 'photo_id,reviewer' });
+    pendingWrites.current.set(id, row); // marcar pendiente hasta confirmar
+    persistReview(row);
     scheduleAutoSubmit(); // el envío al estudio se actualiza solo
   };
 
@@ -359,5 +394,5 @@ export function useGalleryData() {
     await supabase.from('projects').update(patch).eq('id', id);
   };
 
-  return { ...data, loading, error, locked, reviewer, sendState, setReviewer, validatePassword, updatePhoto, updateProject };
+  return { ...data, loading, error, locked, reviewer, sendState, unsaved, setReviewer, validatePassword, updatePhoto, updateProject };
 }

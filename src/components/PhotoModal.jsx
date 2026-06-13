@@ -128,6 +128,42 @@ export function PhotoModal({ photo, allPhotos, onNavigate, onClose, onUpdate }) 
     // si hubo arrastre, dejamos la marca "moved" para que el click posterior no haga toggle de zoom
   };
 
+  // Gestos táctiles (móvil): swipe horizontal = cambiar foto; doble-tap = zoom
+  const touchRef = useRef(null); // { x, y, t, lastTap }
+  const handleTouchStart = (e) => {
+    if (e.touches.length !== 1) return;
+    const t = e.touches[0];
+    const prev = touchRef.current;
+    touchRef.current = { x: t.clientX, y: t.clientY, t: Date.now(), lastTap: prev?.lastTap || 0 };
+  };
+  const handleTouchEnd = (e) => {
+    const s = touchRef.current;
+    if (!s) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - s.x;
+    const dy = t.clientY - s.y;
+    const dt = Date.now() - s.t;
+    // Doble-tap (dos toques rápidos, sin apenas desplazamiento) → alternar zoom
+    if (Math.abs(dx) < 12 && Math.abs(dy) < 12 && dt < 250) {
+      if (Date.now() - s.lastTap < 300) {
+        const rect = e.currentTarget.getBoundingClientRect();
+        setZoomPos({
+          x: Math.round(((t.clientX - rect.left) / rect.width) * 100),
+          y: Math.round(((t.clientY - rect.top) / rect.height) * 100)
+        });
+        setZoomScale(prev => prev === 1 ? 2.5 : 1);
+        touchRef.current.lastTap = 0;
+        return;
+      }
+      touchRef.current.lastTap = Date.now();
+      return;
+    }
+    // Swipe horizontal (solo sin zoom) → foto anterior/siguiente
+    if (zoomScale <= 1 && Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
+      goTo(dx < 0 ? currentIndex + 1 : currentIndex - 1);
+    }
+  };
+
   const handleSave = () => {
     onUpdate(photo.id, { note });
     onClose();
@@ -165,6 +201,8 @@ export function PhotoModal({ photo, allPhotos, onNavigate, onClose, onUpdate }) 
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
           style={{ cursor: zoomScale > 1 ? 'grab' : 'zoom-in' }}
         >
           {photo.url && (

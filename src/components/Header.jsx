@@ -1,7 +1,7 @@
 import React from 'react';
-import { User, Check, Loader } from 'lucide-react';
+import { User, Check, Loader, CloudOff } from 'lucide-react';
 
-export function Header({ project, photosCount, daysCount, totalStarred, totalSel, reviewer, reviewedCount, sendState, onChangeReviewer }) {
+export function Header({ project, photosCount, daysCount, totalStarred, totalSel, reviewer, reviewedCount, sendState, unsaved, onChangeReviewer }) {
   const handleChangeReviewer = () => {
     const next = window.prompt('Switch reviewer — your current marks stay saved under your name. New name:', reviewer || '');
     if (next && next.trim()) onChangeReviewer(next);
@@ -39,16 +39,22 @@ export function Header({ project, photosCount, daysCount, totalStarred, totalSel
         </div>
 
         {reviewer && (
-          <div className={`autosave-chip ${sendState === 'saving' ? 'saving' : sendState === 'sent' ? 'sent' : ''}`}
-               title="Your selection is sent to the studio automatically — no button needed.">
-            {sendState === 'saving' ? (
-              <><Loader size={12} className="spin" /> Saving…</>
-            ) : sendState === 'sent' ? (
-              <><Check size={12} /> Sent to studio</>
-            ) : (
-              <>Auto-saves to studio</>
-            )}
-          </div>
+          unsaved > 0 ? (
+            <div className="autosave-chip offline" title="A few changes haven't saved yet — they'll sync automatically when the connection is back.">
+              <CloudOff size={12} /> {unsaved} unsaved
+            </div>
+          ) : (
+            <div className={`autosave-chip ${sendState === 'saving' ? 'saving' : sendState === 'sent' ? 'sent' : ''}`}
+                 title="Your selection is sent to the studio automatically — no button needed.">
+              {sendState === 'saving' ? (
+                <><Loader size={12} className="spin" /> Saving…</>
+              ) : sendState === 'sent' ? (
+                <><Check size={12} /> Sent to studio</>
+              ) : (
+                <>Auto-saves to studio</>
+              )}
+            </div>
+          )
         )}
 
         {project?.client_logo ? (
