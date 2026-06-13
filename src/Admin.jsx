@@ -541,8 +541,11 @@ end norm
           }
         } catch (e) { console.warn('thumb fail', e); }
 
+        // Guardar el nombre ORIGINAL del archivo (sin extensión) para que el
+        // sync con Capture One/Lightroom empareje por nombre real, no por el id aleatorio
+        const originalName = file.name.replace(/\.[^.]+$/, '');
         await supabase.from('photos').insert([
-          { url: publicUrl, thumb_url: thumbUrl, look_id: selectedLook, stars: 0, color: null }
+          { url: publicUrl, thumb_url: thumbUrl, look_id: selectedLook, stars: 0, color: null, label: originalName }
         ]);
       } else {
         console.error("Error subiendo ", file.name, uploadError);
