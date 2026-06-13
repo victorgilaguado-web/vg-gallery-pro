@@ -292,11 +292,6 @@ export function useGalleryData() {
         const created = await res.json().catch(() => null);
         if (created && created[0]) submissionIdRef.current = created[0].id;
         creatingRef.current = false;
-        // Primera marca de este revisor → avisar "ha empezado"
-        if (!notifiedStartRef.current) {
-          notifiedStartRef.current = true;
-          notify('start', summary, keepalive);
-        }
       }
       setSendState('sent');
     } catch {
@@ -310,6 +305,15 @@ export function useGalleryData() {
     if (autoTimer.current) clearTimeout(autoTimer.current);
     autoTimer.current = setTimeout(() => flushSubmission(false), 2500);
   }, [flushSubmission]);
+
+  // Aviso "ha ENTRADO": en cuanto un revisor identificado abre la galería cargada,
+  // marque o no. Una sola vez por carga de página.
+  useEffect(() => {
+    if (!loading && reviewer && data.project && !notifiedStartRef.current) {
+      notifiedStartRef.current = true;
+      notify('start', computeSummary());
+    }
+  }, [loading, reviewer, data.project]);
 
   // Flush + aviso "ha terminado" al ocultar/cerrar la pestaña (best-effort con keepalive)
   useEffect(() => {
