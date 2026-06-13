@@ -745,9 +745,9 @@ end norm
 
         {/* Envíos recibidos */}
         <div style={{ marginBottom: 26 }}>
-          <label style={{ fontSize: 11, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 10 }}>Submissions received</label>
+          <label style={{ fontSize: 11, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 10 }}>Reviewers · auto-updated live</label>
           {submissionsList.length === 0 ? (
-            <p style={{ color: '#555', fontSize: 13 }}>No submissions yet. Clients press “Submit selection” when they finish reviewing.</p>
+            <p style={{ color: '#555', fontSize: 13 }}>No activity yet. Each reviewer appears here automatically as soon as they start marking photos — they don't submit anything.</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {submissionsList.map(sub => {

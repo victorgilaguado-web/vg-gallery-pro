@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { supabase } from '../supabase';
+import { supabase, SUPABASE_URL, SUPABASE_KEY } from '../supabase';
 
 export function useGalleryData() {
   const [loading, setLoading] = useState(true);
@@ -203,11 +203,105 @@ export function useGalleryData() {
     if (!clean || !data.project) return;
     localStorage.setItem(`vg_reviewer_${data.project.id}`, clean);
     setReviewerState(clean);
+    submissionIdRef.current = null; // otro revisor = otra fila de envío
+    setSendState('idle');
     const reviewMap = await fetchReviews(data.rawPhotos.map(p => p.id), clean);
     const merged = mergeReviews(data.rawPhotos, reviewMap);
     photosRef.current = merged;
     setData(prev => ({ ...prev, photos: merged }));
   }, [data.project, data.rawPhotos]);
+
+  // ── Auto-envío al estudio ───────────────────────────────────────────────
+  // La selección se manda sola: tras cada cambio (con un pequeño retardo) y al
+  // cerrar/ocultar la pestaña. Se mantiene UNA fila por revisor en submissions,
+  // que se va actualizando — el cliente no tiene que pulsar nada.
+  const [sendState, setSendState] = useState('idle'); // 'idle' | 'saving' | 'sent'
+  const submissionIdRef = useRef(null);
+  const creatingRef = useRef(false);
+  const autoTimer = useRef(null);
+
+  const computeSummary = () => {
+    const photos = photosRef.current;
+    const marked = photos.filter(p => (parseInt(p.stars) || 0) > 0 || p.color != null || (p.note && p.note.trim()));
+    return {
+      total_photos: photos.length,
+      reviewed: marked.length,
+      selects: photos.filter(p => parseInt(p.color) === 3).length,
+      retouch: photos.filter(p => parseInt(p.color) === 2).length,
+      review: photos.filter(p => parseInt(p.color) === 1).length,
+      discard: photos.filter(p => parseInt(p.color) === 0).length,
+      starred: photos.filter(p => (parseInt(p.stars) || 0) > 0).length,
+      notes: photos.filter(p => p.note && p.note.trim()).length
+    };
+  };
+
+  // Localiza (una vez) la fila de envío existente de este revisor
+  const ensureSubmissionId = useCallback(async (projectId, reviewerName) => {
+    if (submissionIdRef.current) return submissionIdRef.current;
+    const { data: rows } = await supabase
+      .from('submissions')
+      .select('id')
+      .eq('project_id', projectId)
+      .eq('reviewer', reviewerName)
+      .order('created_at', { ascending: false })
+      .limit(1);
+    if (rows && rows[0]) submissionIdRef.current = rows[0].id;
+    return submissionIdRef.current;
+  }, []);
+
+  // Crea o actualiza la fila. keepalive=true para que sobreviva al cierre de pestaña.
+  const flushSubmission = useCallback(async (keepalive = false) => {
+    const proj = data.project;
+    const rev = reviewer;
+    if (!proj || !rev) return;
+    const summary = computeSummary();
+    if (summary.reviewed === 0) return; // nada que enviar todavía
+    const h = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' };
+    try {
+      const existingId = await ensureSubmissionId(proj.id, rev);
+      if (existingId) {
+        await fetch(`${SUPABASE_URL}/rest/v1/submissions?id=eq.${existingId}`, {
+          method: 'PATCH',
+          headers: { ...h, Prefer: 'return=minimal' },
+          body: JSON.stringify({ summary, created_at: new Date().toISOString() }),
+          keepalive
+        });
+      } else if (!creatingRef.current) {
+        creatingRef.current = true;
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/submissions`, {
+          method: 'POST',
+          headers: { ...h, Prefer: 'return=representation' },
+          body: JSON.stringify({ project_id: proj.id, reviewer: rev, summary }),
+          keepalive
+        });
+        const created = await res.json().catch(() => null);
+        if (created && created[0]) submissionIdRef.current = created[0].id;
+        creatingRef.current = false;
+      }
+      setSendState('sent');
+    } catch {
+      setSendState('idle');
+    }
+  }, [data.project, reviewer, ensureSubmissionId]);
+
+  // Agenda el auto-envío unos segundos después del último cambio
+  const scheduleAutoSubmit = useCallback(() => {
+    setSendState('saving');
+    if (autoTimer.current) clearTimeout(autoTimer.current);
+    autoTimer.current = setTimeout(() => flushSubmission(false), 2500);
+  }, [flushSubmission]);
+
+  // Flush al ocultar/cerrar la pestaña (best-effort con keepalive)
+  useEffect(() => {
+    const onHide = () => { if (document.visibilityState === 'hidden') flushSubmission(true); };
+    const onPageHide = () => flushSubmission(true);
+    document.addEventListener('visibilitychange', onHide);
+    window.addEventListener('pagehide', onPageHide);
+    return () => {
+      document.removeEventListener('visibilitychange', onHide);
+      window.removeEventListener('pagehide', onPageHide);
+    };
+  }, [flushSubmission]);
 
   // Las marcas van a photo_reviews (una fila por foto+revisor), no a la tabla photos
   const updatePhoto = async (id, patch) => {
@@ -229,28 +323,7 @@ export function useGalleryData() {
       updated_at: new Date().toISOString()
     };
     await supabase.from('photo_reviews').upsert(row, { onConflict: 'photo_id,reviewer' });
-  };
-
-  // Enviar la selección al estudio: snapshot en la tabla submissions
-  const submitSelection = async () => {
-    if (!data.project || !reviewer) return { error: 'No reviewer' };
-    const marked = data.photos.filter(p => (parseInt(p.stars) || 0) > 0 || p.color != null || (p.note && p.note.trim()));
-    const summary = {
-      total_photos: data.photos.length,
-      reviewed: marked.length,
-      selects: data.photos.filter(p => parseInt(p.color) === 3).length,
-      retouch: data.photos.filter(p => parseInt(p.color) === 2).length,
-      review: data.photos.filter(p => parseInt(p.color) === 1).length,
-      discard: data.photos.filter(p => parseInt(p.color) === 0).length,
-      starred: data.photos.filter(p => (parseInt(p.stars) || 0) > 0).length,
-      notes: data.photos.filter(p => p.note && p.note.trim()).length
-    };
-    const { error } = await supabase.from('submissions').insert({
-      project_id: data.project.id,
-      reviewer,
-      summary
-    });
-    return { error: error?.message || null, summary };
+    scheduleAutoSubmit(); // el envío al estudio se actualiza solo
   };
 
   const updateProject = async (id, patch) => {
@@ -261,5 +334,5 @@ export function useGalleryData() {
     await supabase.from('projects').update(patch).eq('id', id);
   };
 
-  return { ...data, loading, error, locked, reviewer, setReviewer, validatePassword, updatePhoto, updateProject, submitSelection };
+  return { ...data, loading, error, locked, reviewer, sendState, setReviewer, validatePassword, updatePhoto, updateProject };
 }

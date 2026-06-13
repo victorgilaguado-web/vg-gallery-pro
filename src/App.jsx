@@ -106,7 +106,7 @@ function Onboarding({ onClose }) {
           <div><span className="kbd-hint">●</span> Color labels: <span style={{color:'#2ECC71'}}>Select</span>, <span style={{color:'#3498DB'}}>Retouch</span>, <span style={{color:'#F39C12'}}>Review</span>, <span style={{color:'#E74C3C'}}>Discard</span> (keys <b>6-9</b>)</div>
           <div><span className="kbd-hint">⏎</span> Click a photo to open it large — arrows to move, drag to pan when zoomed</div>
           <div><span className="kbd-hint">⌘</span> Cmd+click 2-4 photos to compare them side by side</div>
-          <div><span className="kbd-hint">✓</span> When you're done, press <b>Submit selection</b> at the top</div>
+          <div><span className="kbd-hint">✓</span> Nothing to submit — your picks are <b>saved and sent to the studio automatically</b></div>
         </div>
         <button className="overlay-btn" style={{ marginTop: 28 }} onClick={onClose}>Got it</button>
       </div>
@@ -115,7 +115,7 @@ function Onboarding({ onClose }) {
 }
 
 function App() {
-  const { project, days, looks, photos, moodboard, loading, error, locked, reviewer, setReviewer, validatePassword, updatePhoto, updateProject, submitSelection } = useGalleryData();
+  const { project, days, looks, photos, moodboard, loading, error, locked, reviewer, sendState, setReviewer, validatePassword, updatePhoto, updateProject } = useGalleryData();
   const [showOnboarding, setShowOnboarding] = useState(false);
 
   const [activeDay, setActiveDay] = useState(null);
@@ -242,8 +242,8 @@ function App() {
         totalSel={totalSel}
         reviewer={reviewer}
         reviewedCount={reviewedCount}
+        sendState={sendState}
         onChangeReviewer={setReviewer}
-        onSubmitSelection={submitSelection}
         onUpdateProject={updateProject}
       />
       

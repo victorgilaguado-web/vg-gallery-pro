@@ -1038,3 +1038,25 @@ textarea.note-input:focus {
 .dlg-btn.primary { background: #fff; border-color: #fff; color: #000; font-weight: 600; }
 .dlg-btn.primary:hover { opacity: 0.85; }
 .dlg-btn.primary.danger { background: #E74C3C; border-color: #E74C3C; color: #fff; }
+
+/* ───────── Auto-save chip (reemplaza al botón Submit) ───────── */
+.autosave-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  color: var(--text-tertiary);
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  transition: var(--transition-fast);
+}
+.autosave-chip.saving { color: var(--text-secondary); border-color: var(--border-hover); }
+.autosave-chip.sent { color: #2ECC71; border-color: rgba(46, 204, 113, 0.3); }
+.autosave-chip .spin { animation: spin 0.9s linear infinite; }
+
+@media (max-width: 768px) {
+  .autosave-chip { padding: 6px 10px; font-size: 10px; }
+}
