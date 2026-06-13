@@ -219,6 +219,21 @@ export function useGalleryData() {
   const submissionIdRef = useRef(null);
   const creatingRef = useRef(false);
   const autoTimer = useRef(null);
+  const notifiedStartRef = useRef(false); // avisar al estudio solo una vez al empezar
+
+  // Aviso al estudio (email vía función de servidor). Fire-and-forget, nunca rompe la app.
+  const notify = (event, summary = {}, keepalive = false) => {
+    const proj = data.project;
+    if (!proj || !reviewer) return;
+    try {
+      fetch('/api/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ project: proj.name, reviewer, event, summary }),
+        keepalive
+      }).catch(() => {});
+    } catch { /* sin red: ignorar */ }
+  };
 
   const computeSummary = () => {
     const photos = photosRef.current;
@@ -277,6 +292,11 @@ export function useGalleryData() {
         const created = await res.json().catch(() => null);
         if (created && created[0]) submissionIdRef.current = created[0].id;
         creatingRef.current = false;
+        // Primera marca de este revisor → avisar "ha empezado"
+        if (!notifiedStartRef.current) {
+          notifiedStartRef.current = true;
+          notify('start', summary, keepalive);
+        }
       }
       setSendState('sent');
     } catch {
@@ -291,15 +311,20 @@ export function useGalleryData() {
     autoTimer.current = setTimeout(() => flushSubmission(false), 2500);
   }, [flushSubmission]);
 
-  // Flush al ocultar/cerrar la pestaña (best-effort con keepalive)
+  // Flush + aviso "ha terminado" al ocultar/cerrar la pestaña (best-effort con keepalive)
   useEffect(() => {
-    const onHide = () => { if (document.visibilityState === 'hidden') flushSubmission(true); };
-    const onPageHide = () => flushSubmission(true);
+    const finish = () => {
+      const summary = computeSummary();
+      flushSubmission(true);
+      // Solo avisar de fin si llegó a marcar algo y ya habíamos avisado del inicio
+      if (summary.reviewed > 0 && notifiedStartRef.current) notify('finished', summary, true);
+    };
+    const onHide = () => { if (document.visibilityState === 'hidden') finish(); };
     document.addEventListener('visibilitychange', onHide);
-    window.addEventListener('pagehide', onPageHide);
+    window.addEventListener('pagehide', finish);
     return () => {
       document.removeEventListener('visibilitychange', onHide);
-      window.removeEventListener('pagehide', onPageHide);
+      window.removeEventListener('pagehide', finish);
     };
   }, [flushSubmission]);
 
