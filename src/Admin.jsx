@@ -1,6 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabase';
-import { Edit2, Plus, Folder, Calendar, Trash2, Settings, Image as ImageIcon, Link as LinkIcon, Eye } from 'lucide-react';
+import { Edit2, Plus, Folder, Calendar, Trash2, Settings, Image as ImageIcon, Link as LinkIcon, Eye, Inbox, ClipboardCopy, FileDown, Printer, RefreshCw } from 'lucide-react';
+import { DialogHost, dialogAlert, dialogConfirm, dialogPrompt } from './components/Dialogs';
+
+// Miniatura JPEG (~1200px lado largo) generada en el navegador antes de subir
+const makeThumb = (file, maxSize = 1200, quality = 0.82) => new Promise((resolve) => {
+  const img = new Image();
+  const url = URL.createObjectURL(file);
+  img.onload = () => {
+    const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+    if (scale >= 1) { URL.revokeObjectURL(url); resolve(null); return; }
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(img.width * scale);
+    canvas.height = Math.round(img.height * scale);
+    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob(b => { URL.revokeObjectURL(url); resolve(b); }, 'image/jpeg', quality);
+  };
+  img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+  img.src = url;
+});
+
+const fileNameFromUrl = (url) => (url || '').split('/').pop().split('?')[0];
 
 export function Admin() {
   const [pass, setPass] = useState('');
@@ -17,6 +37,14 @@ export function Admin() {
   const [selectedLook, setSelectedLook] = useState('');
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
+
+  // Selecciones de clientes (photo_reviews) y envíos (submissions)
+  const [submissionsList, setSubmissionsList] = useState([]);
+  const [selectionData, setSelectionData] = useState({ photos: [], reviews: [] });
+  const [selectionsLoaded, setSelectionsLoaded] = useState(false);
+  const [loadingSelections, setLoadingSelections] = useState(false);
+  const [exportReviewer, setExportReviewer] = useState('');
+  const [exportCriteria, setExportCriteria] = useState('selects');
 
   // States Gestor de Fotos
   const [managingLook, setManagingLook] = useState(null);
@@ -53,6 +81,136 @@ export function Admin() {
       if (projLooks.length > 0) setSelectedLook(projLooks[0].id);
       else setSelectedLook('');
     }
+
+    // Reset selecciones: se cargan bajo demanda (pueden ser miles de fotos)
+    setSelectionData({ photos: [], reviews: [] });
+    setSelectionsLoaded(false);
+
+    const { data: subs } = await supabase.from('submissions').select('*')
+      .eq('project_id', activeProj.id).order('created_at', { ascending: false }).limit(12);
+    setSubmissionsList(subs || []);
+  };
+
+  // Fotos + marcas de todos los revisores del proyecto (para export y hoja de contactos).
+  // Bajo demanda: puede traer miles de fotos, así que solo al pulsar el botón.
+  const loadSelections = async () => {
+    setLoadingSelections(true);
+    try {
+      const dayIds = days.map(d => d.id);
+      const lookIds = looks.filter(l => dayIds.includes(l.day_id)).map(l => l.id);
+      let photos = [];
+      for (let i = 0; i < lookIds.length; i += 50) {
+        const chunk = lookIds.slice(i, i + 50);
+        let page = 0, more = chunk.length > 0;
+        while (more) {
+          const { data } = await supabase.from('photos').select('id,label,url,thumb_url')
+            .in('look_id', chunk).range(page * 1000, (page + 1) * 1000 - 1);
+          if (data && data.length) { photos.push(...data); more = data.length === 1000; page++; }
+          else more = false;
+        }
+      }
+      const ids = photos.map(p => p.id);
+      let reviews = [];
+      for (let i = 0; i < ids.length; i += 100) {
+        const { data } = await supabase.from('photo_reviews').select('*').in('photo_id', ids.slice(i, i + 100));
+        if (data) reviews.push(...data);
+      }
+      setSelectionData({ photos, reviews });
+      setSelectionsLoaded(true);
+      const reviewers = [...new Set(reviews.map(r => r.reviewer))];
+      setExportReviewer(prev => reviewers.includes(prev) ? prev : (reviewers[0] || ''));
+    } finally {
+      setLoadingSelections(false);
+    }
+  };
+
+  const matchCriteria = (r, crit) => {
+    const st = parseInt(r.stars) || 0;
+    const col = r.color == null ? -1 : parseInt(r.color);
+    if (crit === 'selects') return col === 3;
+    if (crit === 'retouch') return col === 2;
+    if (crit === 's3') return st >= 3;
+    if (crit === 'any') return st > 0 || col >= 0 || (r.note || '').trim() !== '';
+    return false;
+  };
+
+  const buildExportList = () => {
+    const byId = Object.fromEntries(selectionData.photos.map(p => [p.id, p]));
+    return selectionData.reviews
+      .filter(r => r.reviewer === exportReviewer && matchCriteria(r, exportCriteria))
+      .map(r => ({ ...(byId[r.photo_id] || {}), _review: r }))
+      .filter(p => p.id);
+  };
+
+  const exportName = (p) => p.label || fileNameFromUrl(p.url).replace(/\.[^.]+$/, '');
+
+  // Lista de nombres para pegar como filtro en Capture One / Lightroom
+  const copyExportList = async () => {
+    const list = buildExportList();
+    if (!list.length) return dialogAlert('No photos match that reviewer + criteria.', 'Nothing to export');
+    await navigator.clipboard.writeText(list.map(exportName).join('\n'));
+    await dialogAlert(`${list.length} file names copied to the clipboard. Paste them into the filename filter in Capture One or Lightroom.`, 'Copied');
+  };
+
+  const downloadExportList = async () => {
+    const list = buildExportList();
+    if (!list.length) return dialogAlert('No photos match that reviewer + criteria.', 'Nothing to export');
+    const blob = new Blob([list.map(exportName).join('\n')], { type: 'text/plain' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `${(project?.name || 'selection').replace(/[^a-z0-9]+/gi, '_')}_${exportReviewer}_${exportCriteria}.txt`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  // Hoja de contactos imprimible (guardar como PDF desde el diálogo de impresión)
+  const openContactSheet = async () => {
+    const list = buildExportList();
+    if (!list.length) return dialogAlert('No photos match that reviewer + criteria.', 'Nothing to export');
+    const CL = ['Discard', 'Review', 'Retouch', 'Select'];
+    const CC = ['#E74C3C', '#F39C12', '#3498DB', '#2ECC71'];
+    const cells = list.map(p => {
+      const r = p._review;
+      const st = parseInt(r.stars) || 0;
+      const col = r.color == null ? -1 : parseInt(r.color);
+      const img = p.thumb_url || (p.url.includes('cloudinary.com') ? p.url.replace('/upload/', '/upload/w_500,q_auto/') : p.url);
+      return `<div class="cell">
+        <div class="imgbox"><img src="${img}" loading="lazy"></div>
+        <div class="cap">
+          <div class="fn">${exportName(p)}</div>
+          <div class="marks">${st ? '★'.repeat(st) : ''}${col >= 0 ? ` <span style="color:${CC[col]}">● ${CL[col]}</span>` : ''}</div>
+          ${(r.note || '').trim() ? `<div class="note">${r.note.replace(/</g, '&lt;')}</div>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+    const html = `<!doctype html><html><head><meta charset="utf-8"><title>${project?.name || ''} — Contact Sheet</title>
+<style>
+  body { font-family: -apple-system, 'Helvetica Neue', sans-serif; margin: 0; padding: 32px; color: #111; }
+  .hdr { display: flex; justify-content: space-between; align-items: baseline; border-bottom: 2px solid #111; padding-bottom: 14px; margin-bottom: 22px; }
+  .hdr h1 { font-size: 20px; font-weight: 600; margin: 0; letter-spacing: 1px; }
+  .hdr .meta { font-size: 11px; color: #666; text-align: right; line-height: 1.6; }
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+  .cell { break-inside: avoid; border: 1px solid #ddd; border-radius: 4px; overflow: hidden; }
+  .imgbox { aspect-ratio: 3/4; background: #f4f4f4; }
+  .imgbox img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .cap { padding: 7px 9px; }
+  .fn { font-size: 9px; font-weight: 600; letter-spacing: 0.3px; word-break: break-all; }
+  .marks { font-size: 9px; color: #b58900; margin-top: 3px; }
+  .note { font-size: 8.5px; color: #555; margin-top: 4px; font-style: italic; line-height: 1.4; }
+  .printbtn { position: fixed; top: 14px; right: 14px; padding: 10px 22px; background: #111; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; }
+  @media print { .printbtn { display: none; } body { padding: 0; } }
+</style></head><body>
+<button class="printbtn" onclick="window.print()">Print / Save PDF</button>
+<div class="hdr">
+  <h1>${(project?.name || '').toUpperCase()}</h1>
+  <div class="meta">VG Studio — Contact Sheet<br>Reviewer: ${exportReviewer} · ${list.length} photos · ${new Date().toLocaleDateString('en-GB')}</div>
+</div>
+<div class="grid">${cells}</div>
+</body></html>`;
+    const w = window.open('', '_blank');
+    if (!w) return dialogAlert('The browser blocked the pop-up. Allow pop-ups for this site and try again.', 'Pop-up blocked');
+    w.document.write(html);
+    w.document.close();
   };
 
   const initializeAdmin = async () => {
@@ -80,7 +238,7 @@ export function Admin() {
 
   // --- LOGICA DE PROYECTOS MAESTRO (CRUD) ---
   const addProject = async () => {
-    const name = window.prompt("Name of the new client or commercial session:");
+    const name = await dialogPrompt("Name of the new client or commercial session:", "", "New project");
     if (!name || name.trim() === '') return;
     
     const cleanName = name.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
@@ -90,19 +248,19 @@ export function Admin() {
     const { data, error } = await supabase.from('projects').insert([{ name: name.trim(), slug }]).select().single();
     
     if (error) {
-       alert("Error creating project. Did you enable the INSERT policy in your DB?: " + error.message);
+       await dialogAlert("Error creating project. Did you enable the INSERT policy in your DB?: " + error.message, "Error");
        return;
     }
     if (data) {
        const list = await loadProjects();
        setProject(data); // Saltamos a la vista en blanco de este nuevo proyecto
-       alert("Project created and private link generated!");
+       await dialogAlert("Project created and private link generated!", "Done");
     }
   };
 
   const deleteProject = async () => {
     if (!project) return;
-    const word = window.prompt(`DANGER ZONE: Type "DELETE" to permanently remove the project "${project.name}" and physically purge all its photos from storage (frees up space):`);
+    const word = await dialogPrompt(`Type "DELETE" to permanently remove the project "${project.name}" and physically purge all its photos from storage. This cannot be undone.`, "", "Danger zone");
     if (word !== 'DELETE') return;
     
     // 1. Recolectar toda la basura física que hay que purgar de la Nube
@@ -146,21 +304,21 @@ export function Admin() {
     // 3. Destruir la obra definitivamente en la Base de Datos
     const { error } = await supabase.from('projects').delete().eq('id', project.id);
     if (error) {
-       alert("Delete failed. Check that DELETE is enabled in your Supabase policies: " + error.message);
+       await dialogAlert("Delete failed. Check that DELETE is enabled in your Supabase policies: " + error.message, "Error");
        return;
     }
     
-    alert("Purge complete! Storage space freed and project destroyed.");
+    await dialogAlert("Purge complete! Storage space freed and project destroyed.", "Done");
     const list = await loadProjects();
     setProject(list.length > 0 ? list[0] : null);
   };
 
   const renameProject = async () => {
-    const name = window.prompt("Rename the project (website and tab title):", project?.name);
+    const name = await dialogPrompt("Rename the project (website and tab title):", project?.name, "Rename project");
     if (!name || name.trim() === '' || name === project?.name) return;
     
     const { error } = await supabase.from('projects').update({ name: name.trim() }).eq('id', project.id);
-    if (error) alert("Error updating: " + error.message);
+    if (error) await dialogAlert("Error updating: " + error.message, "Error");
     
     // Recargar solo para forzar actualización del título
     const { data } = await supabase.from('projects').select('*').eq('id', project.id).single();
@@ -183,16 +341,16 @@ export function Admin() {
        setProject(p);
        loadProjects();
        
-       alert('Client logo updated successfully!');
+       await dialogAlert('Client logo updated successfully!', 'Done');
     } else {
-       alert("There was an error uploading the logo: " + (error?.message || JSON.stringify(error)));
+       await dialogAlert("There was an error uploading the logo: " + (error?.message || JSON.stringify(error)), "Error");
     }
     setUploading(false);
   };
 
   const updatePassword = async () => {
     const defaultMsg = project?.password ? `The project is currently protected with "${project.password}".` : "The project is PUBLIC with no barriers.";
-    const pass = window.prompt(`${defaultMsg}\n\nType the new PIN or secret key to protect access. Leave it completely blank (and press OK) to disable the lock:`, project?.password || '');
+    const pass = await dialogPrompt(`${defaultMsg}\n\nType the new PIN or secret key to protect access. Leave it completely blank (and press OK) to disable the lock:`, project?.password || '', "Privacy lock");
     
     if (pass === null) return; // Si la cancela
     
@@ -200,39 +358,39 @@ export function Admin() {
     const finalPass = pass.trim() === '' ? null : pass.trim();
     
     const { error } = await supabase.from('projects').update({ password: finalPass }).eq('id', project.id);
-    if (error) alert("Error updating the key: " + error.message);
+    if (error) await dialogAlert("Error updating the key: " + error.message, "Error");
     else {
       const { data } = await supabase.from('projects').select('*').eq('id', project.id).single();
       setProject(data);
       loadProjects();
-      alert(finalPass ? `Gallery LOCKED! Current key: ${finalPass}` : "Lock removed. The gallery is now public again for anyone with the URL.");
+      await dialogAlert(finalPass ? `Gallery locked! Current key: ${finalPass}` : "Lock removed. The gallery is now public again for anyone with the URL.", "Privacy lock");
     }
   };
 
 
   // --- LOGICA DEL GESTOR (CRUD CARPETAS) ---
   const addDay = async () => {
-    const name = window.prompt("Name of the new main section (e.g. Studio, Product, Wedding):");
+    const name = await dialogPrompt("Name of the new main section (e.g. Studio, Product, Wedding):", "", "New section");
     if (!name || name.trim() === '') return;
     const { data } = await supabase.from('days').insert([{ name: name.trim(), project_id: project?.id }]).select().single();
     if (data) setDays(prev => [...prev, data]);
   };
   
   const renameDay = async (id, oldName) => {
-    const name = window.prompt("Type the new name for this section:", oldName);
+    const name = await dialogPrompt("Type the new name for this section:", oldName, "Rename section");
     if (!name || name.trim() === '' || name === oldName) return;
     await supabase.from('days').update({ name: name.trim() }).eq('id', id);
     loadProjectData(project);
   };
 
   const deleteDay = async (id, name) => {
-    if (!window.confirm(`⚠️ THIS CANNOT BE UNDONE: Are you sure you want to completely delete the section "${name}"?`)) return;
+    if (!(await dialogConfirm(`This cannot be undone: are you sure you want to completely delete the section "${name}"?`, "Delete section", true))) return;
     await supabase.from('days').delete().eq('id', id);
     loadProjectData(project);
   };
 
   const addLook = async (dayId) => {
-    const name = window.prompt("Name of the new destination folder (e.g. Shoes, Night, Outdoor):");
+    const name = await dialogPrompt("Name of the new destination folder (e.g. Shoes, Night, Outdoor):", "", "New folder");
     if (!name || name.trim() === '') return;
     const { data } = await supabase.from('looks').insert([{ name: name.trim(), day_id: dayId }]).select().single();
     if (data) {
@@ -242,14 +400,14 @@ export function Admin() {
   };
 
   const renameLook = async (id, oldName) => {
-    const name = window.prompt("New folder name:", oldName);
+    const name = await dialogPrompt("New folder name:", oldName, "Rename folder");
     if (!name || name.trim() === '' || name === oldName) return;
     await supabase.from('looks').update({ name: name.trim() }).eq('id', id);
     loadProjectData(project);
   };
 
   const deleteLook = async (id, name) => {
-    if (!window.confirm(`⚠️ Are you sure you want to permanently delete the sub-folder "${name}"? (Any photos inside will be orphaned)`)) return;
+    if (!(await dialogConfirm(`Are you sure you want to permanently delete the sub-folder "${name}"? Any photos inside will be orphaned.`, "Delete folder", true))) return;
     await supabase.from('looks').delete().eq('id', id);
     loadProjectData(project);
   };
@@ -257,38 +415,50 @@ export function Admin() {
 
   // --- LOGICA DE SUBIDA (SUBMIT FILES MULTIUSO) ---
   const handleFiles = async (files) => {
-    if (!selectedLook) return alert("First select a destination folder or the Moodboard option.");
+    if (!selectedLook) return dialogAlert("First select a destination folder.", "No folder selected");
     if (files.length === 0) return;
     
     setUploading(true);
     let done = 0;
     
     for (const file of Array.from(files)) {
+      const baseName = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
       const fileExt = file.name.split('.').pop();
-      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
+      const fileName = `${baseName}.${fileExt}`;
 
       const { data, error: uploadError } = await supabase.storage
         .from('photos')
         .upload(fileName, file);
-        
+
       if (!uploadError && data) {
         const { data: { publicUrl } } = supabase.storage.from('photos').getPublicUrl(fileName);
-        
+
+        // Generar y subir miniatura ligera para que la galería cargue rápido
+        let thumbUrl = null;
+        try {
+          const thumbBlob = await makeThumb(file);
+          if (thumbBlob) {
+            const thumbName = `${baseName}_thumb.jpg`;
+            const { error: tErr } = await supabase.storage.from('photos').upload(thumbName, thumbBlob, { contentType: 'image/jpeg' });
+            if (!tErr) thumbUrl = supabase.storage.from('photos').getPublicUrl(thumbName).data.publicUrl;
+          }
+        } catch (e) { console.warn('thumb fail', e); }
+
         await supabase.from('photos').insert([
-          { url: publicUrl, look_id: selectedLook, stars: 0, color: null }
+          { url: publicUrl, thumb_url: thumbUrl, look_id: selectedLook, stars: 0, color: null }
         ]);
       } else {
         console.error("Error subiendo ", file.name, uploadError);
-        alert("Photo upload failed: " + uploadError?.message);
+        await dialogAlert("Photo upload failed: " + uploadError?.message, "Error");
       }
-      
+
       done++;
       setProgress(Math.round((done / files.length) * 100));
     }
     
     setUploading(false);
     setProgress(0);
-    alert('Images uploaded and synced successfully!');
+    await dialogAlert('Images uploaded and synced successfully!', 'Done');
   };
 
   const handleDrop = (e) => {
@@ -318,7 +488,7 @@ export function Admin() {
   };
 
   const deletePhoto = async (photoId, photoUrl) => {
-     if (!window.confirm('⚠️ WARNING: Are you sure you want to PERMANENTLY delete this photo from the servers and the gallery?')) return;
+     if (!(await dialogConfirm("Are you sure you want to permanently delete this photo from the servers and the gallery?", "Delete photo", true))) return;
      
      try {
        // Purge from storage
@@ -333,7 +503,7 @@ export function Admin() {
      
      const { error } = await supabase.from('photos').delete().eq('id', photoId);
      if (error) {
-       alert("Error deleting photo from the database: " + error.message);
+       await dialogAlert("Error deleting photo from the database: " + error.message, "Error");
      } else {
        setFolderPhotos(prev => prev.filter(p => p.id !== photoId));
      }
@@ -345,7 +515,7 @@ export function Admin() {
     return (
       <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a0a0a', color: '#fff' }}>
         <form onSubmit={e => { e.preventDefault(); if (pass === '181122') setAuth(true); }}>
-          <h2 style={{ fontFamily: 'Outfit', fontWeight: 300, marginBottom: 20 }}>Centro de Mando</h2>
+          <h2 style={{ fontFamily: 'Outfit', fontWeight: 300, marginBottom: 20 }}>Command Center</h2>
           <input 
             type="password" 
             placeholder="Access Key" 
@@ -353,7 +523,7 @@ export function Admin() {
             onChange={e => setPass(e.target.value)}
             style={{ padding: '12px', background: '#111', border: '1px solid #333', color: '#fff', borderRadius: 4, marginRight: 10, width: 200 }}
           />
-          <button type="submit" style={{ padding: '12px 24px', background: '#fff', color: '#000', borderRadius: 4, fontWeight: 500 }}>Entrar</button>
+          <button type="submit" style={{ padding: '12px 24px', background: '#fff', color: '#000', borderRadius: 4, fontWeight: 500 }}>Enter</button>
         </form>
       </div>
     );
@@ -363,9 +533,13 @@ export function Admin() {
   // Fallback si algún proyecto viejo no tiene slug (caso extremo)
   const projectUrl = project ? `https://${siteHost}/${project.slug || '?p=' + project.id}` : `https://${siteHost}`;
 
+  const reviewerNames = [...new Set(selectionData.reviews.map(r => r.reviewer))];
+  const exportCount = buildExportList().length;
+
   return (
     <div style={{ padding: '40px', background: '#0a0a0a', minHeight: '100vh', color: '#fff', fontFamily: 'Inter' }}>
-      
+      <DialogHost />
+
       {/* 0. SECCIÓN: SELECTOR DE ARQUITECTURA MULTI-PROYECTO */}
       <div style={{ background: '#18181b', padding: '20px 30px', borderRadius: 8, marginBottom: 30, border: '1px solid #3f3f46', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
          <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
@@ -458,6 +632,92 @@ export function Admin() {
 
       </div>
       
+      {/* 1.5 SECCIÓN: SELECCIONES DE CLIENTE (envíos + export + hoja de contactos) */}
+      <div style={{ background: '#111', padding: '30px', borderRadius: 8, marginBottom: 40, border: '1px solid #222' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+          <Inbox size={20} color="#2ECC71" />
+          <h2 style={{ fontSize: 18, fontWeight: 500, margin: 0 }}>Client Selections</h2>
+          <button onClick={() => loadProjectData(project)} title="Refresh"
+            style={{ marginLeft: 'auto', background: 'transparent', border: '1px solid #333', color: '#888', padding: '6px 10px', borderRadius: 6, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+            <RefreshCw size={13} /> Refresh
+          </button>
+        </div>
+
+        {/* Envíos recibidos */}
+        <div style={{ marginBottom: 26 }}>
+          <label style={{ fontSize: 11, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 10 }}>Submissions received</label>
+          {submissionsList.length === 0 ? (
+            <p style={{ color: '#555', fontSize: 13 }}>No submissions yet. Clients press “Submit selection” when they finish reviewing.</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {submissionsList.map(sub => {
+                const sm = sub.summary || {};
+                return (
+                  <div key={sub.id} style={{ display: 'flex', alignItems: 'center', gap: 16, background: '#18181b', border: '1px solid #2a2a2a', borderRadius: 6, padding: '12px 16px' }}>
+                    <div style={{ width: 34, height: 34, borderRadius: '50%', background: '#2ECC71', color: '#000', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: 14, flexShrink: 0 }}>
+                      {(sub.reviewer || '?').charAt(0).toUpperCase()}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 14, color: '#eee', fontWeight: 500 }}>{sub.reviewer || 'Anonymous'}</div>
+                      <div style={{ fontSize: 11, color: '#888' }}>{new Date(sub.created_at).toLocaleString('en-GB')}</div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 18, fontSize: 12, color: '#aaa', flexWrap: 'wrap' }}>
+                      <span><b style={{ color: '#2ECC71' }}>{sm.selects ?? 0}</b> selects</span>
+                      <span><b style={{ color: '#3498DB' }}>{sm.retouch ?? 0}</b> retouch</span>
+                      <span><b style={{ color: '#fff' }}>{sm.starred ?? 0}</b> ★</span>
+                      <span><b style={{ color: '#fff' }}>{sm.reviewed ?? 0}</b>/{sm.total_photos ?? 0} reviewed</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Export a Capture One / hoja de contactos */}
+        <div style={{ borderTop: '1px solid #222', paddingTop: 22 }}>
+          <label style={{ fontSize: 11, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 12 }}>Export selection</label>
+          {!selectionsLoaded ? (
+            <button onClick={loadSelections} disabled={loadingSelections}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#222', color: '#eee', border: '1px solid #444', padding: '10px 18px', borderRadius: 6, cursor: 'pointer', fontSize: 13 }}>
+              <RefreshCw size={14} /> {loadingSelections ? 'Loading client marks…' : 'Load client marks to export'}
+            </button>
+          ) : reviewerNames.length === 0 ? (
+            <p style={{ color: '#555', fontSize: 13 }}>No client marks yet for this project.</p>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 14, flexWrap: 'wrap' }}>
+              <div>
+                <label style={{ fontSize: 11, color: '#888', display: 'block', marginBottom: 5 }}>Reviewer</label>
+                <select value={exportReviewer} onChange={e => setExportReviewer(e.target.value)}
+                  style={{ background: '#0a0a0a', color: '#fff', border: '1px solid #444', padding: '9px 12px', borderRadius: 6, fontSize: 13, minWidth: 150, cursor: 'pointer' }}>
+                  {reviewerNames.map(n => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 11, color: '#888', display: 'block', marginBottom: 5 }}>Criteria</label>
+                <select value={exportCriteria} onChange={e => setExportCriteria(e.target.value)}
+                  style={{ background: '#0a0a0a', color: '#fff', border: '1px solid #444', padding: '9px 12px', borderRadius: 6, fontSize: 13, minWidth: 160, cursor: 'pointer' }}>
+                  <option value="selects">● Selects only</option>
+                  <option value="retouch">● Retouch</option>
+                  <option value="s3">★★★ or more</option>
+                  <option value="any">Any mark</option>
+                </select>
+              </div>
+              <span style={{ fontSize: 13, color: '#666', paddingBottom: 9 }}>{exportCount} photo{exportCount !== 1 ? 's' : ''}</span>
+              <button onClick={copyExportList} style={{ display: 'flex', alignItems: 'center', gap: 7, background: '#fff', color: '#000', border: 'none', padding: '10px 16px', borderRadius: 6, cursor: 'pointer', fontSize: 12, fontWeight: 600 }}>
+                <ClipboardCopy size={14} /> Copy file names
+              </button>
+              <button onClick={downloadExportList} style={{ display: 'flex', alignItems: 'center', gap: 7, background: '#222', color: '#eee', border: '1px solid #444', padding: '10px 16px', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
+                <FileDown size={14} /> .txt
+              </button>
+              <button onClick={openContactSheet} style={{ display: 'flex', alignItems: 'center', gap: 7, background: '#222', color: '#eee', border: '1px solid #444', padding: '10px 16px', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>
+                <Printer size={14} /> Contact sheet (PDF)
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* 2. SECCIÓN DE ESTRUCTURA Y CARPETAS */}
       <div style={{ background: '#111', padding: '30px', borderRadius: 8, marginBottom: 40, border: '1px solid #222' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
@@ -506,7 +766,7 @@ export function Admin() {
                     onClick={() => addLook(day.id)}
                     style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, border: '1px dashed #444', padding: '10px', borderRadius: 6, cursor: 'pointer', color: '#888', fontSize: 13 }}
                   >
-                    <Plus size={14} /> Crear Carpeta
+                    <Plus size={14} /> New Folder
                   </div>
                 </div>
 
@@ -572,7 +832,7 @@ export function Admin() {
           
           {uploading ? (
             <div>
-              <h3 style={{ fontWeight: 400, color: '#3498DB', margin: 0 }}>Procesando en la nube... {progress}%</h3>
+              <h3 style={{ fontWeight: 400, color: '#3498DB', margin: 0 }}>Processing in the cloud... {progress}%</h3>
               <div style={{ width: '100%', maxWidth: 400, background: '#000', height: 8, margin: '20px auto', borderRadius: 4 }}>
                 <div style={{ width: `${progress}%`, background: '#3498DB', height: '100%', borderRadius: 4, transition: 'width 0.3s' }}></div>
               </div>
@@ -580,7 +840,7 @@ export function Admin() {
           ) : (
             <div>
               <h3 style={{ fontWeight: 400, color: '#ccc', marginBottom: 10 }}>Drag the images for this folder here</h3>
-              <p style={{ fontSize: 13, color: '#666' }}>O pulsa sobre el recuadro para seleccionar desde tu disco.</p>
+              <p style={{ fontSize: 13, color: '#666' }}>Or click the box to pick files from your disk.</p>
             </div>
           )}
         </div>
@@ -592,15 +852,15 @@ export function Admin() {
            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 30, borderBottom: '1px solid #333', paddingBottom: 20 }}>
               <div>
                 <h2 style={{ margin: 0, fontSize: 24, fontWeight: 500, color: '#fff', fontFamily: 'Outfit' }}>
-                   Carpeta: {managingLook.name}
+                   Folder: {managingLook.name}
                 </h2>
-                <p style={{ margin: '5px 0 0 0', color: '#888', fontSize: 13 }}>Gestor de archivos individuales</p>
+                <p style={{ margin: '5px 0 0 0', color: '#888', fontSize: 13 }}>Individual file manager</p>
               </div>
               <button 
                  onClick={() => setManagingLook(null)} 
                  style={{ background: '#333', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: 6, cursor: 'pointer', fontWeight: 500 }}
               >
-                 Cerrar Gestor
+                 Close Manager
               </button>
            </div>
            

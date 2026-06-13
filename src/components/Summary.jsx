@@ -118,7 +118,7 @@ export function Summary({ photos=[], onUpdatePhoto }) {
              return (
                <div key={p.id} style={{ display: 'flex', background: 'var(--bg-surface)', borderTop: '1px solid var(--border-color)' }}>
                  <div style={{ width: '160px', flexShrink: 0, position: 'relative' }}>
-                    <img src={thumb(p.url, 300)} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} alt="" />
+                    <img src={thumb(p.thumb_url || p.url, 300)} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} alt="" />
                     {col >= 0 && <div className="color-dot" style={{ background: COLORS[col] }}></div>}
                  </div>
                  <div style={{ padding: '20px', flex: 1, display: 'flex', flexDirection: 'column' }}>

@@ -208,7 +208,7 @@ export function PhotoModal({ photo, allPhotos, onNavigate, onClose, onUpdate }) 
                 onClick={() => goTo(i)}
                 title={p.label || ''}
               >
-                <img src={thumb(p.url, 200)} alt="" loading="lazy" draggable={false} />
+                <img src={thumb(p.thumb_url || p.url, 200)} alt="" loading="lazy" draggable={false} />
                 {pc >= 0 && <span className="strip-dot" style={{ background: COLORS[pc] }}></span>}
                 {ps > 0 && <span className="strip-stars">{ps}★</span>}
               </div>

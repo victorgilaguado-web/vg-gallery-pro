@@ -69,7 +69,7 @@ export function CompareView({ photos, onUpdatePhoto, onClose, onRemove }) {
             <div key={p.id} className={`compare-cell ${isActive ? 'active' : ''}`} onClick={() => setActiveId(p.id)}>
               <div className="compare-img-wrap">
                 <img
-                  src={thumb(p.url, 1200)}
+                  src={thumb(p.thumb_url || p.url, 1200)}
                   alt=""
                   draggable={false}
                   style={zoomed ? { objectFit: 'cover' } : undefined}

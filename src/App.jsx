@@ -65,8 +65,58 @@ function LockScreen({ project, onUnlock }) {
   );
 }
 
+// ¿Quién está revisando? — cada persona tiene su propia selección
+function ReviewerGate({ project, onSubmit }) {
+  const [name, setName] = useState('');
+  return (
+    <div className="overlay-screen">
+      <div className="overlay-card">
+        {project?.client_logo && <img src={project.client_logo} alt="" style={{ height: 70, objectFit: 'contain', marginBottom: 28, maxWidth: '80%' }} />}
+        <h2 style={{ fontFamily: 'Outfit', fontWeight: 300, marginBottom: 10 }}>Who is reviewing?</h2>
+        <p style={{ fontSize: 13, color: '#888', marginBottom: 30, lineHeight: 1.6 }}>
+          Each person keeps their own selection — your stars, labels and notes won't overwrite anyone else's.
+        </p>
+        <form onSubmit={e => { e.preventDefault(); if (name.trim()) onSubmit(name); }}>
+          <input
+            autoFocus
+            type="text"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            placeholder="Your name"
+            className="overlay-input"
+          />
+          <button type="submit" disabled={!name.trim()} className="overlay-btn">
+            Start reviewing
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// Mini guía de bienvenida la primera vez
+function Onboarding({ onClose }) {
+  return (
+    <div className="overlay-screen" onClick={onClose}>
+      <div className="overlay-card onboarding-card" onClick={e => e.stopPropagation()}>
+        <h2 style={{ fontFamily: 'Outfit', fontWeight: 300, marginBottom: 6 }}>Quick guide</h2>
+        <p style={{ fontSize: 12, color: '#777', marginBottom: 24 }}>Reviewing is fast — here's all you need:</p>
+        <div className="onboarding-rows">
+          <div><span className="kbd-hint">★</span> Click the stars under a photo to rate it (or press <b>1-5</b>)</div>
+          <div><span className="kbd-hint">●</span> Color labels: <span style={{color:'#2ECC71'}}>Select</span>, <span style={{color:'#3498DB'}}>Retouch</span>, <span style={{color:'#F39C12'}}>Review</span>, <span style={{color:'#E74C3C'}}>Discard</span> (keys <b>6-9</b>)</div>
+          <div><span className="kbd-hint">⏎</span> Click a photo to open it large — arrows to move, drag to pan when zoomed</div>
+          <div><span className="kbd-hint">⌘</span> Cmd+click 2-4 photos to compare them side by side</div>
+          <div><span className="kbd-hint">✓</span> When you're done, press <b>Submit selection</b> at the top</div>
+        </div>
+        <button className="overlay-btn" style={{ marginTop: 28 }} onClick={onClose}>Got it</button>
+      </div>
+    </div>
+  );
+}
+
 function App() {
-  const { project, days, looks, photos, moodboard, loading, error, locked, validatePassword, updatePhoto, updateProject } = useGalleryData();
+  const { project, days, looks, photos, moodboard, loading, error, locked, reviewer, setReviewer, validatePassword, updatePhoto, updateProject, submitSelection } = useGalleryData();
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   const [activeDay, setActiveDay] = useState(null);
   const [activeLook, setActiveLook] = useState(null);
@@ -119,6 +169,16 @@ function App() {
      return <LockScreen project={project} onUnlock={validatePassword} />;
   }
 
+  // Tras desbloquear: identificar al revisor (selección por persona)
+  if (!reviewer) {
+    return <ReviewerGate project={project} onSubmit={(name) => {
+      setReviewer(name);
+      if (!localStorage.getItem(`vg_onboard_${project?.id}`)) setShowOnboarding(true);
+    }} />;
+  }
+
+  const reviewedCount = photos.filter(p => (parseInt(p.stars) || 0) > 0 || p.color != null || (p.note && p.note.trim())).length;
+
   const handleTabChange = (dayId, lookId) => {
     setActiveDay(dayId);
     setActiveLook(lookId);
@@ -168,12 +228,22 @@ function App() {
 
   return (
     <div className="app-container">
-      <Header 
-        project={project} 
-        photosCount={photos.length} 
-        daysCount={days.length} 
-        totalStarred={totalStarred} 
+      {showOnboarding && (
+        <Onboarding onClose={() => {
+          localStorage.setItem(`vg_onboard_${project?.id}`, '1');
+          setShowOnboarding(false);
+        }} />
+      )}
+      <Header
+        project={project}
+        photosCount={photos.length}
+        daysCount={days.length}
+        totalStarred={totalStarred}
         totalSel={totalSel}
+        reviewer={reviewer}
+        reviewedCount={reviewedCount}
+        onChangeReviewer={setReviewer}
+        onSubmitSelection={submitSelection}
         onUpdateProject={updateProject}
       />
       

@@ -128,7 +128,7 @@ export function GalleryGrid({ photos, onUpdatePhoto, gridCols }) {
               onClick={(e) => handleCardClick(e, p.id)}
             >
               <div className="img-wrap">
-                {p.url && <img src={thumb(p.url, 1000)} alt="" loading="lazy" />}
+                {p.url && <img src={thumb(p.thumb_url || p.url, 1000)} alt="" loading="lazy" />}
                 {col >= 0 && <div className="color-dot" style={{ background: COLORS[col] }}></div>}
                 {st > 0 && <div className="star-badge">{st}★</div>}
                 {inCompare && <div className="compare-badge">{compareIds.indexOf(p.id) + 1}</div>}
