@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabase';
-import { Edit2, Plus, Folder, Calendar, Trash2, Settings, Image as ImageIcon, Link as LinkIcon, Eye, Inbox, ClipboardCopy, FileDown, Printer, RefreshCw, Aperture } from 'lucide-react';
+import { Edit2, Plus, Folder, Calendar, Trash2, Settings, Image as ImageIcon, Link as LinkIcon, Eye, Inbox, ClipboardCopy, FileDown, Printer, RefreshCw, Aperture, LogOut } from 'lucide-react';
 import { DialogHost, dialogAlert, dialogConfirm, dialogPrompt } from './components/Dialogs';
 
 // Miniatura JPEG (~1200px lado largo) generada en el navegador antes de subir
@@ -23,9 +23,15 @@ const makeThumb = (file, maxSize = 1200, quality = 0.82) => new Promise((resolve
 const fileNameFromUrl = (url) => (url || '').split('/').pop().split('?')[0];
 
 export function Admin() {
+  // Login real con Supabase Auth (cada operación del admin va firmada por tu sesión)
+  const [session, setSession] = useState(null);
+  const [checkingSession, setCheckingSession] = useState(true);
+  const [email, setEmail] = useState('');
   const [pass, setPass] = useState('');
-  const [auth, setAuth] = useState(false);
-  
+  const [authError, setAuthError] = useState('');
+  const [loggingIn, setLoggingIn] = useState(false);
+  const auth = !!session;
+
   // States de Colecciones Maestras
   const [projectsList, setProjectsList] = useState([]);
   const [project, setProject] = useState(null);
@@ -316,6 +322,30 @@ end norm
     if (list.length > 0 && !project) {
        setProject(list[0]);
     }
+  };
+
+  // Sesión de Supabase Auth: comprobar al cargar y suscribirse a cambios
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session);
+      setCheckingSession(false);
+    });
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setAuthError('');
+    setLoggingIn(true);
+    const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password: pass });
+    if (error) setAuthError(error.message);
+    setLoggingIn(false);
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setSession(null);
   };
 
   // Efecto Maestro
@@ -611,19 +641,37 @@ end norm
 
 
   // --- Interfaz Lógica ---
+  if (checkingSession) {
+    return <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a0a0a', color: '#666', fontFamily: 'Inter', fontSize: 13, letterSpacing: 2 }}>…</div>;
+  }
+
   if (!auth) {
     return (
-      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a0a0a', color: '#fff' }}>
-        <form onSubmit={e => { e.preventDefault(); if (pass === '181122') setAuth(true); }}>
-          <h2 style={{ fontFamily: 'Outfit', fontWeight: 300, marginBottom: 20 }}>Command Center</h2>
-          <input 
-            type="password" 
-            placeholder="Access Key" 
-            value={pass} 
-            onChange={e => setPass(e.target.value)}
-            style={{ padding: '12px', background: '#111', border: '1px solid #333', color: '#fff', borderRadius: 4, marginRight: 10, width: 200 }}
+      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a0a0a', color: '#fff', fontFamily: 'Inter' }}>
+        <form onSubmit={handleLogin} style={{ width: 320, background: '#111', border: '1px solid #222', borderRadius: 10, padding: 36 }}>
+          <h2 style={{ fontFamily: 'Outfit', fontWeight: 300, marginBottom: 6, textAlign: 'center' }}>Command Center</h2>
+          <p style={{ fontSize: 12, color: '#666', marginBottom: 26, textAlign: 'center' }}>Studio admin access</p>
+          <input
+            type="email"
+            placeholder="Email"
+            value={email}
+            autoComplete="username"
+            onChange={e => setEmail(e.target.value)}
+            style={{ width: '100%', padding: '12px 14px', background: '#000', border: '1px solid #333', color: '#fff', borderRadius: 6, marginBottom: 12, fontSize: 14, outline: 'none' }}
           />
-          <button type="submit" style={{ padding: '12px 24px', background: '#fff', color: '#000', borderRadius: 4, fontWeight: 500 }}>Enter</button>
+          <input
+            type="password"
+            placeholder="Password"
+            value={pass}
+            autoComplete="current-password"
+            onChange={e => setPass(e.target.value)}
+            style={{ width: '100%', padding: '12px 14px', background: '#000', border: '1px solid #333', color: '#fff', borderRadius: 6, marginBottom: 18, fontSize: 14, outline: 'none' }}
+          />
+          {authError && <p style={{ color: '#E74C3C', fontSize: 12, marginBottom: 14 }}>{authError}</p>}
+          <button type="submit" disabled={loggingIn || !email || !pass}
+            style={{ width: '100%', padding: '13px', background: '#fff', color: '#000', borderRadius: 6, fontWeight: 600, fontSize: 13, cursor: (loggingIn || !email || !pass) ? 'not-allowed' : 'pointer', opacity: (loggingIn || !email || !pass) ? 0.5 : 1, border: 'none' }}>
+            {loggingIn ? 'Signing in…' : 'Sign in'}
+          </button>
         </form>
       </div>
     );
@@ -666,9 +714,14 @@ end norm
            </button>
          </div>
 
-         <button onClick={deleteProject} style={{ background: 'transparent', color: '#ef4444', border: '1px solid #ef4444', padding: '8px 14px', borderRadius: 6, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, marginTop: 17 }}>
-           <Trash2 size={14} /> Delete Project
-         </button>
+         <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 17 }}>
+           <button onClick={deleteProject} style={{ background: 'transparent', color: '#ef4444', border: '1px solid #ef4444', padding: '8px 14px', borderRadius: 6, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+             <Trash2 size={14} /> Delete Project
+           </button>
+           <button onClick={handleLogout} title={session?.user?.email || ''} style={{ background: 'transparent', color: '#888', border: '1px solid #333', padding: '8px 14px', borderRadius: 6, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+             <LogOut size={14} /> Log out
+           </button>
+         </div>
       </div>
 
 
