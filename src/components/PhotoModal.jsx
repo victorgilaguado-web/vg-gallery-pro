@@ -71,7 +71,7 @@ export function PhotoModal({ photo, allPhotos, onNavigate, onClose, onUpdate }) 
       // 1-5 estrellas, 0 limpia
       if (['1', '2', '3', '4', '5'].includes(e.key)) {
         const v = parseInt(e.key);
-        onUpdate(photo.id, { stars: curStars === v ? 0 : v });
+        onUpdate(photo.id, { stars: v });
       }
       if (e.key === '0') onUpdate(photo.id, { stars: 0 });
 
@@ -233,7 +233,7 @@ export function PhotoModal({ photo, allPhotos, onNavigate, onClose, onUpdate }) 
               <span
                 key={star}
                 className={`star-icon ${curStars >= star ? 'filled' : ''}`}
-                onClick={() => onUpdate(photo.id, { stars: curStars === star ? 0 : star })}
+                onClick={() => onUpdate(photo.id, { stars: star })}
               >
                 ★
               </span>

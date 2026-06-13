@@ -39,7 +39,7 @@ export function CompareView({ photos, onUpdatePhoto, onClose, onRemove }) {
 
       if (['1','2','3','4','5'].includes(e.key)) {
         const v = parseInt(e.key);
-        onUpdatePhoto(photo.id, { stars: curStars === v ? 0 : v });
+        onUpdatePhoto(photo.id, { stars: v });
       }
       if (e.key === '0') onUpdatePhoto(photo.id, { stars: 0 });
       if (['6','7','8','9'].includes(e.key)) {
@@ -90,7 +90,7 @@ export function CompareView({ photos, onUpdatePhoto, onClose, onRemove }) {
                     <span
                       key={star}
                       className={`star-icon ${st >= star ? 'filled' : ''}`}
-                      onClick={() => onUpdatePhoto(p.id, { stars: st === star ? 0 : star })}
+                      onClick={() => onUpdatePhoto(p.id, { stars: star })}
                     >★</span>
                   ))}
                 </div>
