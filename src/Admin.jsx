@@ -46,6 +46,7 @@ export function Admin() {
 
   // Selecciones de clientes (photo_reviews) y envíos (submissions)
   const [submissionsList, setSubmissionsList] = useState([]);
+  const [refreshing, setRefreshing] = useState(false);
   const [selectionData, setSelectionData] = useState({ photos: [], reviews: [] });
   const [selectionsLoaded, setSelectionsLoaded] = useState(false);
   const [loadingSelections, setLoadingSelections] = useState(false);
@@ -93,7 +94,7 @@ export function Admin() {
     setSelectionsLoaded(false);
 
     const { data: subs } = await supabase.from('submissions').select('*')
-      .eq('project_id', activeProj.id).order('created_at', { ascending: false }).limit(12);
+      .eq('project_id', activeProj.id).order('created_at', { ascending: false }).limit(100);
     setSubmissionsList(subs || []);
   };
 
@@ -790,20 +791,24 @@ end norm
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
           <Inbox size={20} color="#2ECC71" />
           <h2 style={{ fontSize: 18, fontWeight: 500, margin: 0 }}>Client Selections</h2>
-          <button onClick={() => loadProjectData(project)} title="Refresh"
-            style={{ marginLeft: 'auto', background: 'transparent', border: '1px solid #333', color: '#888', padding: '6px 10px', borderRadius: 6, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
-            <RefreshCw size={13} /> Refresh
+          <button onClick={async () => { setRefreshing(true); await loadProjectData(project); setRefreshing(false); }} title="Refresh" disabled={refreshing}
+            style={{ marginLeft: 'auto', background: 'transparent', border: '1px solid #333', color: '#888', padding: '6px 10px', borderRadius: 6, cursor: refreshing ? 'wait' : 'pointer', display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+            <RefreshCw size={13} style={{ animation: refreshing ? 'spin 0.8s linear infinite' : 'none' }} /> {refreshing ? 'Refreshing…' : 'Refresh'}
           </button>
         </div>
 
-        {/* Envíos recibidos */}
+        {/* Envíos recibidos — una fila por revisor (la más reciente) */}
         <div style={{ marginBottom: 26 }}>
           <label style={{ fontSize: 11, color: '#a1a1aa', textTransform: 'uppercase', letterSpacing: 1, display: 'block', marginBottom: 10 }}>Reviewers · auto-updated live</label>
           {submissionsList.length === 0 ? (
-            <p style={{ color: '#555', fontSize: 13 }}>No activity yet. Each reviewer appears here automatically as soon as they start marking photos — they don't submit anything.</p>
+            <p style={{ color: '#555', fontSize: 13 }}>No activity yet. Each reviewer appears here automatically the moment they open the gallery.</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {submissionsList.map(sub => {
+              {Object.values(submissionsList.reduce((acc, s) => {
+                const key = (s.reviewer || 'Anonymous').trim().toLowerCase();
+                if (!acc[key] || new Date(s.created_at) > new Date(acc[key].created_at)) acc[key] = s;
+                return acc;
+              }, {})).sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).map(sub => {
                 const sm = sub.summary || {};
                 return (
                   <div key={sub.id} style={{ display: 'flex', alignItems: 'center', gap: 16, background: '#18181b', border: '1px solid #2a2a2a', borderRadius: 6, padding: '12px 16px' }}>

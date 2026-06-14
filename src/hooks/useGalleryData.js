@@ -265,12 +265,13 @@ export function useGalleryData() {
   }, []);
 
   // Crea o actualiza la fila. keepalive=true para que sobreviva al cierre de pestaña.
-  const flushSubmission = useCallback(async (keepalive = false) => {
+  // force=true crea la fila aunque no haya marcas (para registrar "ha entrado").
+  const flushSubmission = useCallback(async (keepalive = false, force = false) => {
     const proj = data.project;
     const rev = reviewer;
     if (!proj || !rev) return;
     const summary = computeSummary();
-    if (summary.reviewed === 0) return; // nada que enviar todavía
+    if (summary.reviewed === 0 && !force) return; // nada que enviar todavía
     const h = { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' };
     try {
       const existingId = await ensureSubmissionId(proj.id, rev);
@@ -312,6 +313,7 @@ export function useGalleryData() {
     if (!loading && reviewer && data.project && !notifiedStartRef.current) {
       notifiedStartRef.current = true;
       notify('start', computeSummary());
+      flushSubmission(false, true); // registra "ha entrado" en el panel del admin, aunque no marque nada
     }
   }, [loading, reviewer, data.project]);
 
