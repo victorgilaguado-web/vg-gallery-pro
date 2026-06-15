@@ -3,22 +3,9 @@ import { supabase } from './supabase';
 import { Edit2, Plus, Folder, Calendar, Trash2, Settings, Image as ImageIcon, Link as LinkIcon, Eye, Inbox, ClipboardCopy, FileDown, Printer, RefreshCw, Aperture, LogOut } from 'lucide-react';
 import { DialogHost, dialogAlert, dialogConfirm, dialogPrompt } from './components/Dialogs';
 
-// Miniatura JPEG (~1200px lado largo) generada en el navegador antes de subir
-const makeThumb = (file, maxSize = 1200, quality = 0.82) => new Promise((resolve) => {
-  const img = new Image();
-  const url = URL.createObjectURL(file);
-  img.onload = () => {
-    const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
-    if (scale >= 1) { URL.revokeObjectURL(url); resolve(null); return; }
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.round(img.width * scale);
-    canvas.height = Math.round(img.height * scale);
-    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-    canvas.toBlob(b => { URL.revokeObjectURL(url); resolve(b); }, 'image/jpeg', quality);
-  };
-  img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
-  img.src = url;
-});
+// Cloudinary: subida sin firma (25 GB gratis). Redimensiona al vuelo por URL.
+const CN = 'dfkxnfxof';   // cloud name
+const CP = 'ut6grqjj';    // unsigned upload preset
 
 const fileNameFromUrl = (url) => (url || '').split('/').pop().split('?')[0];
 
@@ -388,55 +375,19 @@ end norm
 
   const deleteProject = async () => {
     if (!project) return;
-    const word = await dialogPrompt(`Type "DELETE" to permanently remove the project "${project.name}" and physically purge all its photos from storage. This cannot be undone.`, "", "Danger zone");
+    const word = await dialogPrompt(`Type "DELETE" to permanently remove the project "${project.name}" and all its days, looks, photos and selections. This cannot be undone.`, "", "Danger zone");
     if (word !== 'DELETE') return;
-    
-    // 1. Recolectar toda la basura física que hay que purgar de la Nube
-    try {
-      let fileNames = [];
-      const { data: daysData } = await supabase.from('days').select('id').eq('project_id', project.id);
-      
-      if (daysData && daysData.length > 0) {
-        const dayIds = daysData.map(d => d.id);
-        const { data: looksData } = await supabase.from('looks').select('id').in('day_id', dayIds);
-        
-        if (looksData && looksData.length > 0) {
-           const lookIds = looksData.map(l => l.id);
-           const { data: photosData } = await supabase.from('photos').select('url').in('look_id', lookIds);
-           if (photosData) fileNames = [...fileNames, ...photosData.map(p => p.url)];
-        }
-      }
-      
-      const { data: moodData } = await supabase.from('moodboard').select('url').eq('project_id', project.id);
-      if (moodData) fileNames = [...fileNames, ...moodData.map(m => m.url)];
-      
-      if (project.client_logo) fileNames.push(project.client_logo);
 
-      // Limpiar URLs y sacar solo el nombre final del archivo
-      const filesToDelete = fileNames.filter(Boolean).map(url => {
-         const partes = url.split('/');
-         let finalPath = partes[partes.length - 1];
-         // Clean query strings si es q hubiese
-         return finalPath.split('?')[0]; 
-      });
-
-      // 2. Disparar los misiles de purgado al Storage
-      if (filesToDelete.length > 0) {
-         const { error: sErr } = await supabase.storage.from('photos').remove(filesToDelete);
-         if (sErr) console.warn("Aviso de Storage (Falta permiso DELETE en bucket Storage):", sErr.message);
-      }
-    } catch(e) {
-      console.warn("Fallo recolectando basura", e);
-    }
-
-    // 3. Destruir la obra definitivamente en la Base de Datos
+    // Las imágenes viven en Cloudinary (25 GB). Borramos el proyecto de la base
+    // de datos (en cascada borra días, looks, fotos y selecciones). Los archivos
+    // de Cloudinary quedan como huérfanos y se limpian con purge-cloudinary.mjs.
     const { error } = await supabase.from('projects').delete().eq('id', project.id);
     if (error) {
-       await dialogAlert("Delete failed. Check that DELETE is enabled in your Supabase policies: " + error.message, "Error");
+       await dialogAlert("Delete failed: " + error.message, "Error");
        return;
     }
-    
-    await dialogAlert("Purge complete! Storage space freed and project destroyed.", "Done");
+
+    await dialogAlert("Project deleted.", "Done");
     const list = await loadProjects();
     setProject(list.length > 0 ? list[0] : null);
   };
@@ -457,21 +408,21 @@ end norm
   const uploadClientLogo = async (file) => {
     if (!file) return;
     setUploading(true);
-    const fileExt = file.name.split('.').pop();
-    const fileName = `client_logo_${Date.now()}.${fileExt}`;
-    
-    const { data, error } = await supabase.storage.from('photos').upload(fileName, file);
-    if (!error && data) {
-       const { data: { publicUrl } } = supabase.storage.from('photos').getPublicUrl(fileName);
-       await supabase.from('projects').update({ client_logo: publicUrl }).eq('id', project.id);
-       
-       const { data: p } = await supabase.from('projects').select('*').eq('id', project.id).single();
-       setProject(p);
-       loadProjects();
-       
-       await dialogAlert('Client logo updated successfully!', 'Done');
-    } else {
-       await dialogAlert("There was an error uploading the logo: " + (error?.message || JSON.stringify(error)), "Error");
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('upload_preset', CP);
+      const res = await fetch(`https://api.cloudinary.com/v1_1/${CN}/image/upload`, { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!res.ok || !data.secure_url) throw new Error(data.error?.message || 'Cloudinary upload failed');
+
+      await supabase.from('projects').update({ client_logo: data.secure_url }).eq('id', project.id);
+      const { data: p } = await supabase.from('projects').select('*').eq('id', project.id).single();
+      setProject(p);
+      loadProjects();
+      await dialogAlert('Client logo updated successfully!', 'Done');
+    } catch (e) {
+      await dialogAlert("There was an error uploading the logo: " + e.message, "Error");
     }
     setUploading(false);
   };
@@ -550,37 +501,24 @@ end norm
     let done = 0;
     
     for (const file of Array.from(files)) {
-      const baseName = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${baseName}.${fileExt}`;
+      try {
+        // Subida directa a Cloudinary (25 GB gratis). Cloudinary redimensiona
+        // al vuelo por URL, así que no hace falta generar miniatura aparte.
+        const fd = new FormData();
+        fd.append('file', file);
+        fd.append('upload_preset', CP);
+        const res = await fetch(`https://api.cloudinary.com/v1_1/${CN}/image/upload`, { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!res.ok || !data.secure_url) throw new Error(data.error?.message || 'Cloudinary upload failed');
 
-      const { data, error: uploadError } = await supabase.storage
-        .from('photos')
-        .upload(fileName, file);
-
-      if (!uploadError && data) {
-        const { data: { publicUrl } } = supabase.storage.from('photos').getPublicUrl(fileName);
-
-        // Generar y subir miniatura ligera para que la galería cargue rápido
-        let thumbUrl = null;
-        try {
-          const thumbBlob = await makeThumb(file);
-          if (thumbBlob) {
-            const thumbName = `${baseName}_thumb.jpg`;
-            const { error: tErr } = await supabase.storage.from('photos').upload(thumbName, thumbBlob, { contentType: 'image/jpeg' });
-            if (!tErr) thumbUrl = supabase.storage.from('photos').getPublicUrl(thumbName).data.publicUrl;
-          }
-        } catch (e) { console.warn('thumb fail', e); }
-
-        // Guardar el nombre ORIGINAL del archivo (sin extensión) para que el
-        // sync con Capture One/Lightroom empareje por nombre real, no por el id aleatorio
+        // Nombre ORIGINAL (sin extensión) para que el sync con Capture One empareje por nombre
         const originalName = file.name.replace(/\.[^.]+$/, '');
         await supabase.from('photos').insert([
-          { url: publicUrl, thumb_url: thumbUrl, look_id: selectedLook, stars: 0, color: null, label: originalName }
+          { url: data.secure_url, thumb_url: null, look_id: selectedLook, stars: 0, color: null, label: originalName }
         ]);
-      } else {
-        console.error("Error subiendo ", file.name, uploadError);
-        await dialogAlert("Photo upload failed: " + uploadError?.message, "Error");
+      } catch (e) {
+        console.error("Error subiendo ", file.name, e);
+        await dialogAlert("Photo upload failed: " + e.message, "Error");
       }
 
       done++;
@@ -619,19 +557,9 @@ end norm
   };
 
   const deletePhoto = async (photoId, photoUrl) => {
-     if (!(await dialogConfirm("Are you sure you want to permanently delete this photo from the servers and the gallery?", "Delete photo", true))) return;
-     
-     try {
-       // Purge from storage
-       const partes = photoUrl.split('/');
-       let finalPath = partes[partes.length - 1];
-       finalPath = finalPath.split('?')[0];
-       
-       await supabase.storage.from('photos').remove([finalPath]);
-     } catch (e) {
-       console.warn('Fallo borrando del storage físico:', e);
-     }
-     
+     if (!(await dialogConfirm("Are you sure you want to permanently delete this photo from the gallery?", "Delete photo", true))) return;
+
+     // La imagen vive en Cloudinary; aquí borramos la fila de la base de datos.
      const { error } = await supabase.from('photos').delete().eq('id', photoId);
      if (error) {
        await dialogAlert("Error deleting photo from the database: " + error.message, "Error");
