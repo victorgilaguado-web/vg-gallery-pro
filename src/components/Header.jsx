@@ -1,7 +1,7 @@
 import React from 'react';
-import { User, Check, Loader, CloudOff } from 'lucide-react';
+import { User, Check, Loader, CloudOff, Users } from 'lucide-react';
 
-export function Header({ project, photosCount, daysCount, totalStarred, totalSel, reviewer, reviewedCount, sendState, unsaved, onChangeReviewer }) {
+export function Header({ project, photosCount, daysCount, totalStarred, totalSel, reviewer, reviewedCount, sendState, unsaved, onChangeReviewer, onShowOthers }) {
   const handleChangeReviewer = () => {
     const next = window.prompt('Switch reviewer — your current marks stay saved under your name. New name:', reviewer || '');
     if (next && next.trim()) onChangeReviewer(next);
@@ -37,6 +37,12 @@ export function Header({ project, photosCount, daysCount, totalStarred, totalSel
           <span className="stat-item">★ {totalStarred}</span>
           <span className="stat-item">● {totalSel}</span>
         </div>
+
+        {reviewer && onShowOthers && (
+          <button className="others-btn" onClick={onShowOthers} title="See what other reviewers selected">
+            <Users size={13} /> Others' picks
+          </button>
+        )}
 
         {reviewer && (
           unsaved > 0 ? (

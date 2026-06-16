@@ -6,6 +6,7 @@ import { Tabs, LooksTabs } from './components/Tabs';
 import { FilterBar } from './components/FilterBar';
 import { GalleryGrid } from './components/GalleryGrid';
 import { Summary } from './components/Summary';
+import { OthersSelections } from './components/OthersSelections';
 import { Admin } from './Admin';
 import './App.css';
 
@@ -115,8 +116,18 @@ function Onboarding({ onClose }) {
 }
 
 function App() {
-  const { project, days, looks, photos, moodboard, loading, error, locked, reviewer, sendState, unsaved, setReviewer, validatePassword, updatePhoto, updateProject } = useGalleryData();
+  const { project, days, looks, photos, moodboard, loading, error, locked, reviewer, sendState, unsaved, setReviewer, validatePassword, updatePhoto, updateProject, loadOthersSelections } = useGalleryData();
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [othersOpen, setOthersOpen] = useState(false);
+  const [othersGroups, setOthersGroups] = useState(null);
+  const [othersLoading, setOthersLoading] = useState(false);
+
+  const openOthers = async () => {
+    setOthersOpen(true);
+    setOthersLoading(true);
+    try { setOthersGroups(await loadOthersSelections()); }
+    finally { setOthersLoading(false); }
+  };
 
   const [activeDay, setActiveDay] = useState(null);
   const [activeLook, setActiveLook] = useState(null);
@@ -234,6 +245,9 @@ function App() {
           setShowOnboarding(false);
         }} />
       )}
+      {othersOpen && (
+        <OthersSelections groups={othersGroups} loading={othersLoading} onClose={() => setOthersOpen(false)} />
+      )}
       <Header
         project={project}
         photosCount={photos.length}
@@ -245,6 +259,7 @@ function App() {
         sendState={sendState}
         unsaved={unsaved}
         onChangeReviewer={setReviewer}
+        onShowOthers={openOthers}
         onUpdateProject={updateProject}
       />
       

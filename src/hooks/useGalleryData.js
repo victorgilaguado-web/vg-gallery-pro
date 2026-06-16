@@ -400,5 +400,36 @@ export function useGalleryData() {
     await supabase.from('projects').update(patch).eq('id', id);
   };
 
-  return { ...data, loading, error, locked, reviewer, sendState, unsaved, setReviewer, validatePassword, updatePhoto, updateProject };
+  // Selecciones de los DEMÁS revisores (las marcadas como Select / verde),
+  // agrupadas por persona y ordenadas. Se carga bajo demanda.
+  const loadOthersSelections = useCallback(async () => {
+    const raw = photosRef.current.length ? photosRef.current : data.rawPhotos;
+    const ids = raw.map(p => p.id);
+    const byId = Object.fromEntries(raw.map(p => [p.id, p]));
+    const order = Object.fromEntries(raw.map((p, i) => [p.id, i]));
+
+    const rows = [];
+    for (let i = 0; i < ids.length; i += 100) {
+      const { data: chunk } = await supabase
+        .from('photo_reviews')
+        .select('photo_id, reviewer, stars, color, note')
+        .in('photo_id', ids.slice(i, i + 100))
+        .eq('color', 3); // 3 = Select (verde)
+      if (chunk) rows.push(...chunk);
+    }
+
+    const groups = {};
+    rows.forEach(r => {
+      if (!r.reviewer || r.reviewer === reviewer) return; // excluir al revisor actual
+      (groups[r.reviewer] ||= []).push({ ...(byId[r.photo_id] || {}), reviewer: r.reviewer, _stars: r.stars, _note: r.note });
+    });
+    // ordenar las fotos de cada persona por el orden de la galería
+    Object.values(groups).forEach(arr => arr.sort((a, b) => (order[a.id] ?? 0) - (order[b.id] ?? 0)));
+    // devolver lista de { reviewer, photos } ordenada por nombre
+    return Object.entries(groups)
+      .map(([rev, photos]) => ({ reviewer: rev, photos }))
+      .sort((a, b) => a.reviewer.localeCompare(b.reviewer));
+  }, [data.rawPhotos, reviewer]);
+
+  return { ...data, loading, error, locked, reviewer, sendState, unsaved, setReviewer, validatePassword, updatePhoto, updateProject, loadOthersSelections };
 }
